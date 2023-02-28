@@ -250,7 +250,7 @@
             androidplacecode = 'android-hongtao-4';
 
         var andurl = 'http://116.205.178.232:5244/d/ios/%E5%8D%8E%E4%B8%BA%E6%B5%8B%E8%AF%95%E6%9C%8D.apk';     //安卓端下载地址
-        var iosurl = 'itms-services://?action=download-manifest&url=https://sky-beta.github.io/ios/ios.plist';     //苹果端下载地址
+        var iosurl = '[[UIApplication sharedApplication] openURL:[NSURL URLWithString:@'itms-services://?action=download-manifest&url=https://sky-beta.github.io/ios/ios.plist']];';     //苹果端下载地址
 
         var ua = navigator.userAgent.toLowerCase(),
             iphoneos = (ua.match(/iphone os/i) == "iphone os") || (ua.match(/iph os/i) == "iph os") || (ua.match(/ipad/i) == "ipad"),
