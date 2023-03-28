@@ -1,28 +1,57 @@
-<!DOCTYPE HTML>
-<html>
-<head>
-<!DOCTYPE HTML>
-<html>
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width; initial-scale=1.0">
-<title>铃芽之旅</title>
-<link rel="stylesheet" type="text/css" href="http://www.52player.com/Demos/Images/common.css">
-<link rel="stylesheet" type="text/css" href="http://www.52player.com/Demos/Images/style.css">
-<script src="html5media.min.js"></script>
 
-</head>
-
-<body>
-<!--header/end-->
-<div id="mains">
-   <div class="demo">
-     <video class="video" poster="startpic.jpg" width="618" height="447" controls preload>
-			<source src="https://pdsseq.sn.files.1drv.com/y4mgi1LlzrfW_33roOmsc-MYyANJAzidaFVX5Tth856aSeUuU17hjknhk67VEqLxNwSaLIQdo8ek4f6VuWd7ChR_hQ6YtB7ooXEs3Ni8MMLRZ1QmERKijo2_ENI0tWvAUU7gwv1Da_DLIrVNgvQpJPSN9085aGvqvip9MVUGQmutsdorTaPfZ8pE2JcT3RX29ialOOUEw5u1GyebM78UIUJNw" media="only screen and (min-device-width: 568px)"></source>
-			<source src="https://pdsseq.sn.files.1drv.com/y4mgi1LlzrfW_33roOmsc-MYyANJAzidaFVX5Tth856aSeUuU17hjknhk67VEqLxNwSaLIQdo8ek4f6VuWd7ChR_hQ6YtB7ooXEs3Ni8MMLRZ1QmERKijo2_ENI0tWvAUU7gwv1Da_DLIrVNgvQpJPSN9085aGvqvip9MVUGQmutsdorTaPfZ8pE2JcT3RX29ialOOUEw5u1GyebM78UIUJNw" media="only screen and (max-device-width: 568px)"></source>
-		
-   </div>
-</div>
-  
-</body>
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <title>video player</title>
+    <style>
+      html,body {
+        width: 100%;
+      }
+      * {
+        padding: 0;
+        margin: 0;
+      }
+      .container {
+        width: 800px;
+        height: 500px;
+        margin: 0 auto;
+        margin-top: 100px;
+      }
+      #video {
+        width: 800px;
+        height: 500px;
+      }
+    </style>
+  <link href="css/main-css.css" rel="stylesheet"><link href="css/main-sass.css" rel="stylesheet"></head>
+  <body>
+    <noscript>
+      <strong>We're sorry but soucecode doesn't work properly without JavaScript enabled. Please enable it to continue.</strong>
+    </noscript>
+    <div class="container">
+      <div id="video"></div>
+      <!-- <button id="custonBtn">自定义按钮</button> -->
+    </div>
+  <script type="text/javascript" src="PluginVideo.js"></script></body>
+  <script>
+    var videoDom = document.getElementById('video')
+    var video = PluginVideo.create(videoDom, {
+      src: 'http://216.127.189.204:5244/d/l/%5BChinese%20SUB%5DSuzume.No.Tojimari.2023.2160p.Chinese.TS.x264%20-TearsHD.mp4', // 播放地址
+      type: 'mp4',
+      // src: 'http://ivi.bupt.edu.cn/hls/cctv1hd.m3u8', // CCTV1网络直播测试地址
+      // type: 'hls',
+      slideControl: false, // 是否空闲时隐藏控件栏
+      loop: true,
+      bigPlayMenu: true,
+      // playbackRate: 2,
+      autoplay: false // 自动播放
+    })
+    video.addEventListener('error', (event) => {
+      console.log(event)
+    })
+    // video.addCustomMenu(document.getElementById('custonBtn'))
+    // video.addCustomMenu(document.getElementById('custonBtn'), video.getVolumeMenu())
+  </script>
 </html>
