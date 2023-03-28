@@ -1,9 +1,25 @@
-<!doctype html>
+<!DOCTYPE html>
 <html>
-<head>
-    <meta charset="utf-8">
-    <title>玲芽之旅中配版</title>
-<body>
-<iframe src="http://216.127.189.204:5244/d/l/%E9%93%83%E8%8A%BD%E4%B9%8B%E6%97%85%EF%BC%88%E6%9E%AA%EF%BC%89/%5BChinese%20SUB%5DSuzume.No.Tojimari.2023.2160p.Chinese.TS.x264%20-TearsHD.mp4" width="320" height="134" frameborder="0" scrolling="no" allowfullscreen></iframe>
-</body>
+    <head>
+        <meta charset="utf-8" />
+        <title>铃芽之旅</title>
+    </head>
+
+    <body>
+        <video id="video" src="http://216.127.189.204:5244/d/dev/Suzume.mp4" controls="controls" autoplay height="100%" width="100%">您的浏览器不支持。</video>
+        <button type="button" style="text-align: center;" onclick="launchFullScreen(document.getElementById('video'))">全屏</button>
+    </body>
+
+    <script type="text/javascript">
+    //全屏幕播放
+    function launchFullScreen(element) {
+      if(element.requestFullScreen) {
+        element.requestFullScreen();
+      } else if(element.mozRequestFullScreen) {
+        element.mozRequestFullScreen();
+      } else if(element.webkitRequestFullScreen) {
+        element.webkitRequestFullScreen();
+      }
+    }
+    </script>
 </html>
