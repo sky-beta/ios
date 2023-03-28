@@ -1,57 +1,49 @@
 
 <!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width,initial-scale=1.0">
-    <title>video player</title>
-    <style>
-      html,body {
-        width: 100%;
-      }
-      * {
-        padding: 0;
-        margin: 0;
-      }
-      .container {
-        width: 800px;
-        height: 500px;
-        margin: 0 auto;
-        margin-top: 100px;
-      }
-      #video {
-        width: 800px;
-        height: 500px;
-      }
-    </style>
-  <link href="css/main-css.css" rel="stylesheet"><link href="css/main-sass.css" rel="stylesheet"></head>
-  <body>
-    <noscript>
-      <strong>We're sorry but soucecode doesn't work properly without JavaScript enabled. Please enable it to continue.</strong>
-    </noscript>
-    <div class="container">
-      <div id="video"></div>
-      <!-- <button id="custonBtn">自定义按钮</button> -->
-    </div>
-  <script type="text/javascript" src="PluginVideo.js"></script></body>
-  <script>
-    var videoDom = document.getElementById('video')
-    var video = PluginVideo.create(videoDom, {
-      src: 'http://216.127.189.204:5244/d/l/%5BChinese%20SUB%5DSuzume.No.Tojimari.2023.2160p.Chinese.TS.x264%20-TearsHD.mp4', // 播放地址
-      type: 'mp4',
-      // src: 'http://ivi.bupt.edu.cn/hls/cctv1hd.m3u8', // CCTV1网络直播测试地址
-      // type: 'hls',
-      slideControl: false, // 是否空闲时隐藏控件栏
-      loop: true,
-      bigPlayMenu: true,
-      // playbackRate: 2,
-      autoplay: false // 自动播放
-    })
-    video.addEventListener('error', (event) => {
-      console.log(event)
-    })
-    // video.addCustomMenu(document.getElementById('custonBtn'))
-    // video.addCustomMenu(document.getElementById('custonBtn'), video.getVolumeMenu())
-  </script>
+<html>
+<head>
+<meta charset="utf-8">
+<title></title>
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no">
+
+<script src="js/jquery-1.8.3.min.js"></script>
+
+<link rel="stylesheet" href="zy.media.min.css">
+<link href="" rel="stylesheet">
+<style type="text/css">
+#modelView{background-color:#DDDDDD;z-index:0;opacity:0.7;height: 100%;width: 100%;position: relative;}
+.playvideo{padding-top: auto;z-index: 9999;position: relative;}
+.zy_media{z-index: 999999999}
+</style>
+
+</head>
+<body onmousewheel="return false;">
+
+<div class="playvideo">
+<div class="zy_media">
+	<video poster="https://pdsseq.sn.files.1drv.com/y4mgi1LlzrfW_33roOmsc-MYyANJAzidaFVX5Tth856aSeUuU17hjknhk67VEqLxNwSaLIQdo8ek4f6VuWd7ChR_hQ6YtB7ooXEs3Ni8MMLRZ1QmERKijo2_ENI0tWvAUU7gwv1Da_DLIrVNgvQpJPSN9085aGvqvip9MVUGQmutsdorTaPfZ8pE2JcT3RX29ialOOUEw5u1GyebM78UIUJNw" data-config='{"mediaTitle": ""}'>
+		<source src="https://pdsseq.sn.files.1drv.com/y4mgi1LlzrfW_33roOmsc-MYyANJAzidaFVX5Tth856aSeUuU17hjknhk67VEqLxNwSaLIQdo8ek4f6VuWd7ChR_hQ6YtB7ooXEs3Ni8MMLRZ1QmERKijo2_ENI0tWvAUU7gwv1Da_DLIrVNgvQpJPSN9085aGvqvip9MVUGQmutsdorTaPfZ8pE2JcT3RX29ialOOUEw5u1GyebM78UIUJNw" type="video/mp4">
+	  您的浏览器不支持HTML5视频
+ </video>
+</div>
+<div id="modelView">&nbsp;</div>
+</div>
+
+<script src="zy.media.min.js"></script>
+<script>
+//document.documentElement.style.overflow='hidden';
+document.body.style.overflow='hidden';
+zymedia('video',{autoplay: true});
+var screenheight = window.screen.height/2;
+$("#modelView").width(window.screen.width);
+$("#modelView").height(window.screen.height);
+var videoheight = $(".zy_media").height()/2;
+var padding_top = screenheight-videoheight;
+$(".playvideo").css({"top":padding_top});
+$("#modelView").css({"margin-top":-1*(padding_top+$(".zy_media").height())});
+</script>
+
+<div style="text-align:center;margin:50px 0; font:normal 14px/24px 'MicroSoft YaHei';">
+</div>
+</body>
 </html>
