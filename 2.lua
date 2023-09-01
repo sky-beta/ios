@@ -232,7 +232,7 @@ gg.toast("氪金礼包修改成功～")
       gg.searchNumber(":Sky-Test-com.tgc.sky.android.test.gold", gg.TYPE_BYTE, false, gg.SIGN_EQUAL, 0, -1)
       gg.searchNumber("", gg.TYPE_BYTE, false, gg.SIGN_EQUAL, 0, -1)
       gg.getResults(100)
-      gg.editAll(":Sky-Test-com.tgc.sky.android.test.goed", gg.TYPE_BYTE)
+      gg.editAll(":Sky-Test-com.tgc.sky.android.dev.gold", gg.TYPE_BYTE)
       gg.toast("脚本开启成功，游戏已免资格")
       gg.clearResults()
         gg.clearResults()
@@ -1139,7 +1139,7 @@ function HS3()
     "星光大道",
     "万圣节地图",
     "任天堂地图",
-    "极光季虚空1",
+    "获取在线登录",
     "返回主页"
   }, nil, "根据需要传送的地图修改")
   if SN == 1 then
@@ -1399,8 +1399,8 @@ if Core~=0 then
     end
   end
 end
-if txt=="dev.radiance.thatgamecompany.com" then
-  pd="在线|内测服|"
+if txt=="beta.radiance.thatgamecompany.com" then
+  pd="在线|测试服|"
  elseif txt=="x-6jr.pages.dev" then
   pd="在线|测试服|"
  elseif txt=="live.radiance.thatgamecompany.com" then
