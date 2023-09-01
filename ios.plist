@@ -11,7 +11,7 @@
           <key>kind</key>
           <string>software-package</string>
           <key>url</key>
-          <string>http://216.127.189.204:5244/d/ios/Sky.ipa</string>
+          <string>https://nsp-game-jxs-p01-drcn.obs.cn-north-2.myhuaweicloud.com/resource_package/c2f9cfef8d814bd3bb7c8bc0dd9453f2.ipa?attname=Sky_0.22.7_229340.ipa</string>
         </dict>
         <dict>
           <key>kind</key>
@@ -29,7 +29,7 @@
       <key>metadata</key>
       <dict>
         <key>bundle-identifier</key>
-        <string>com.tgc.sky.test.gold</string>
+        <string>com.tgc.sky.ios</string>
         <key>bundle-version</key>
         <string>0.19.5</string>
         <key>kind</key>
