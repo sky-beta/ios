@@ -206,9 +206,9 @@ end
 
 function HS1()
 gg.setRanges(gg.REGION_CODE_APP)
-gg.searchNumber(":SNC", gg.TYPE_BYTE, false, gg.SIGN_EQUAL, 0, -1, 0)
+gg.searchNumber(":SNC32", gg.TYPE_BYTE, false, gg.SIGN_EQUAL, 0, -1, 0)
 revert = gg.getResults(10000, nil, nil, nil, nil, nil, nil, nil, nil)
-gg.editAll(":SNB", gg.TYPE_BYTE)
+gg.editAll(":SNB32", gg.TYPE_BYTE)
 
 gg.clearResults()
 gg.searchNumber(":event_name", gg.TYPE_BYTE, false, gg.SIGN_EQUAL, 0, -1, 0)
