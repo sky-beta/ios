@@ -1,47 +1,162 @@
-<!DOCTYPE html>
+<!DOCTYPE html><html>
 
-<html>
+  <head>
+    <title>App Download</title>
+    <meta charset="utf-8">
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="format-detection" content="address=no" />
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" name="viewport" id="viewport">
+    
+    <style type="text/css">
+      body{background: #fff; margin: 0;}
 
-<head>
+      #main_container{position: relative;}
 
-      <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+      #main{
+        -webkit-transform-origin: 0 0; width: 750px; min-height: 1220px; margin: 0 auto;
+        
+      }
 
-      <meta http-equiv="Content-Language" content="zh-CN" />
+      .tab{
+        display: none;
+        position: relative;
+        width: 750px;
+        height: 100%;
+      }
 
-      <title>季蜡接口</title>
+      .tab.show{display: block;}
 
+      .tab .refer{
+        position: relative;
+          width: 100%;
+          height: 100%;
+      }
+
+      .tab.android .refer{
+        background: url(/static/images/en/android_next.jpg) no-repeat;
+        background-color: #fff;
+      }
+
+      .tab.ios .refer{
+        background: url(/static/images/en/ios_next.jpg) no-repeat;
+        background-color: #fff;
+      }
+
+      #refer_no.ios{
+        background: url(/static/images/en/ios_no.png) no-repeat;
+        background-color: #ededed;
+      }
+
+      #refer_no.android{
+        background: url(/static/images/en/android_no.png) no-repeat;
+        background-color: #ededed;
+      }
+
+      #refer_no .back_to_index_button{
+        position: absolute;
+          text-indent: -9999px;
+          width: 400px;
+          height: 116px;
+          top: 582px;
+          left: 0;
+          right: 0;
+          margin: 0 auto;
+      }
+  </style>
   </head>
 
   <body>
+    <div id="main_container">
+      <div id="main">
+        <div id="weixin_show" class="tab">
+          <div class="refer">
+          </div>
+        </div>
+        <div id="yixin_show" class="tab">
+          <div class="refer">
+          </div>
+        </div>
+        <div id="weibo_show" class="tab">
+          <div class="refer">
+          </div>
+        </div>
+        <div id="refer_no" class="tab">
+          <a class="back_to_index_button" href="https://sky.163.com/">Homepage</a>
+        </div>
+      </div>
+    </div>
+    <script charset="gb2312" src="/static/js/jquery-1.6.4.min.js"></script>
+    <script type="text/javascript">
+      // document.getElementsByTagName("html")[0].style.fontSize=document.body.clientWidth/375*312.5+"%";
+      // function orientation(event){
+      //   var st=setTimeout(function(){
+      //     document.getElementsByTagName("html")[0].style.fontSize=document.body.clientWidth/375*312.5+"%";
+      //   },300)
 
-     <?php
+      // }
+      // if (typeof window.addEventListener != "undefined") {
+      //   window.addEventListener("onorientationchange" in window ? "orientationchange" : "resize", function(e){
+      //     orientation(e);
+      //   }, false);
+      // }
 
-$curl = curl_init();
+      // $("#main").height($(window).height());
 
-curl_setopt_array($curl, array(
-   CURLOPT_URL => 'http://test-cn.your-api-server.com/api/auth/login',
-   CURLOPT_RETURNTRANSFER => true,
-   CURLOPT_ENCODING => '',
-   CURLOPT_MAXREDIRS => 10,
-   CURLOPT_TIMEOUT => 0,
-   CURLOPT_FOLLOWLOCATION => true,
-   CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-   CURLOPT_CUSTOMREQUEST => 'POST',
-   CURLOPT_POSTFIELDS =>'{
-    "username": "{{alist_username}}",
-    "password": "{{alist_password}}"
-}',
-   CURLOPT_HTTPHEADER => array(
-      'User-Agent: Apifox/1.0.0 (https://apifox.com)',
-      'Content-Type: application/json'
-   ),
-));
+      var PAGESIZE = {
+        "width": 750,
+        "height": 1220
+      };
 
-$response = curl_exec($curl);
+      $(window).resize(reSize);
+      reSize();
 
-curl_close($curl);
-echo $response;
+      function browserRedirect() {
+        var sUserAgent = navigator.userAgent.toLowerCase();
+        var bIsIpad = sUserAgent.match(/ipad/i) == "ipad";
+        var bIsIphoneOs = sUserAgent.match(/iphone os/i) == "iphone os";
+        var bIsMidp = sUserAgent.match(/midp/i) == "midp";
+        var bIsUc7 = sUserAgent.match(/rv:1.2.3.4/i) == "rv:1.2.3.4";
+        var bIsUc = sUserAgent.match(/ucweb/i) == "ucweb";
+        var bIsAndroid = sUserAgent.match(/android/i) == "android";
+        var bIsCE = sUserAgent.match(/windows ce/i) == "windows ce";
+        var bIsWM = sUserAgent.match(/windows mobile/i) == "windows mobile";
+        if (bIsIpad || bIsIphoneOs || bIsMidp || bIsUc7 || bIsUc || bIsAndroid || bIsCE || bIsWM) {
+          return true
+        } else {
+          return false
+        }
+      }
 
- </body>
+      function reSize() {
+        var pw = PAGESIZE.width;
+        var ph = PAGESIZE.height;
+        if (browserRedirect()) {
+          var tww = document.body.offsetWidth;
+          var twh = document.body.offsetHeight;
+        } else {
+          var twh = $(window).height();
+          var tww = twh / ph * pw;
+          $('#main').css({
+            'transform-origin': 'top center',
+            '-webkit-transform-origin': 'top center'
+          });
+        }
 
- </html>
+        var wh = twh * pw / tww;
+        var sc = tww / pw;
+        var tw = Math.min(0, (pw - tww) * 0.5);
+        if (sc <= 1) {
+          tw = 0;
+        }
+        $('#main').css({
+          'transform': 'translate(' + tw + 'px, 0px) scale(' + sc + ')',
+          '-webkit-transform': 'translate3d(' + tw + 'px, 0px, 0px) scale(' + sc + ')',
+          'min-height': ph,
+          'height': $(window).height()/sc,
+        });
+        $('#main_container').css({"min-height":twh*sc,"height":$(window).height(),"overflow":"hidden"});
+      }
+
+      var android_type = true;
+      var ios_type = true;
+      var android_link = android_type ? "https://ma75.gdl.netease.com/Sky_Gold_0.12.2_247349_obt_netease_unis
