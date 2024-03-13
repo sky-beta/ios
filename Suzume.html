@@ -308,4 +308,94 @@
               }else{
                 if (ua.match(isIos) || ua == null) {
                   
+                  download(ios_link);
+                } else {
+                  
+                  downloadIosOnPc();
+                }
+
+              }
+              break;
+            case "android":
+              if(!android_type){
+                showNoPackage(android_no_class);
+              }else{
+                if (ua.match(isAndroid)) {
+                  
+                } else {
+                  
+                }
+                download(android_link);
+              }
+              break;
+            case "pc":
+              if(pc_link){
+                download(pc_link);
+              }else if(ios_type){
+                
+                downloadIosOnPc();
+              }else if(android_type){
+                
+                download(android_link);
+              }else{
+                showNoPackage(ios_no_class);
+              }
+              break;
+            case "qr":
+              if (ua.match(isIos) || ua == null) {
+                if(!ios_type){
+                  showNoPackage(ios_no_class);
+                }else{
+                  
+                  download(ios_link);
+                }
+              } else {
+                if(!android_type){
+                  showNoPackage(android_no_class);
+                }else{
+                  
+                  download(android_link);
+                }
+              }
+              break;
+            default:
+              if (ua.match(isIos) || ua == null) {
+                if(!ios_type){
+                  showNoPackage(ios_no_class);
+                }else{
+                  
+                  download(ios_link);
+                }
+              } else if (ua.match(isAndroid)) {
+                if(!android_type){
+                  showNoPackage(android_no_class);
+                }else{
+                  
+                  download(android_link);
+                }
+              } else {
+                if(pc_link){
+                  // TODO add pc download here
+                  download(pc_link);
+                }else if(android_type){
+                  
+                  download(android_link);
+                }else if(ios_type){
+                  
+                  downloadIosOnPc();
+                }else{
+                  showNoPackage(android_no_class);
+                }
+              }
+              break;
+          }
+        }
+        checkDownload();
+      })();
+    </script>
+  </body>
+
+</html>
+
+                  
                   
