@@ -159,4 +159,153 @@
 
       var android_type = true;
       var ios_type = true;
-      var android_link = android_type ? "https://ma75.gdl.netease.com/Sky_Gold_0.12.2_247349_obt_netease_unis
+      var android_link = android_type ? "https://ma75.gdl.netease.com/Sky_Gold_0.12.2_247349_obt_netease_unisec_minify_6e12bc5210f513603b6289019a68b9fe.apk?key1=99e4cf58dce4511923e7ab8dc2436844&key2=65f221d2" : "https://sky.163.com/";
+      var ios_link = ios_type ? "https://itunes.apple.com/cn/app/sky%E5%85%89-%E9%81%87/id1344733855" : "https://sky.163.com/";
+      var android_qq_url = "";
+      var iOS_qq_url = "";
+      var pc_link = "";
+
+      var is_report = false;
+
+      // if(android_link.indexOf("javascript:") != -1){
+      //   android_type = false;
+      // }
+      // if(ios_link.indexOf("javascript:") != -1){
+      //   ios_type = false;
+      // }
+
+      (function() {
+        var is_weixin = function() {
+          if (ua.match(/MicroMessenger/i) == "micromessenger") {
+            return true;
+          } else {
+            return false;
+          }
+        };
+
+        var is_yixin = function() {
+          if (ua.indexOf("yixin") > 0) {
+            return true;
+          } else {
+            return false;
+          }
+        };
+
+        var is_weibo = function() {
+          if (ua.indexOf("weibo") > 0) {
+            return true;
+          } else {
+            return false;
+          }
+        };
+
+        var params = function(u, p) {
+          var m = new RegExp("(?:&|/?)" + p + "=([^&$]+)").exec(u);
+          return m ? m[1] : '';
+        };
+
+        var download = function(url) {
+          if (ua.match(isIos) || ua == null) {
+            if(!is_report)window.location.href = url;
+            else{
+              setTimeout(function(){
+                window.location.href = url;
+              },500);
+            }
+          }else{
+            window.location.href = url;
+          }
+        };
+
+        var addCheckCode = function(code) {
+          is_report = true;
+          document.write("<iframe  src=\"" + code + "\" width=\"0\" height=\"0\" style=\"border:0px\">><\/iframe>");
+        };
+
+        var dtype = params(location.search, 'type');
+        var ua = navigator.userAgent.toLowerCase();
+        var isIos = /ipad|iphone|ipod|ios|Mac/i;
+        var isAndroid = /android/i;
+
+        var ios_no_class ="ios";
+        var android_no_class ="android";
+
+        function showNoPackage(classname){
+          $("#refer_no").addClass(classname).addClass("show");
+          // $("#refer_no").fadeIn();
+          if(classname==ios_no_class){
+            if(ios_link.indexOf("javascript:") != -1){
+              download(ios_link);
+            }
+          }else if(classname==android_no_class){
+            if(android_link.indexOf("javascript:") != -1){
+              download(android_link);
+            }
+          }
+        }
+        function downloadIosOnPc(){
+          if(ios_link.toLowerCase().indexOf(".plist")>-1){ 
+            var plistUrl=ios_link.match(/https\:\/\/.*\.plist/)[0];
+            $.ajax({
+              type:"get",
+              url:"/ipa",
+              data: {uri: plistUrl},
+              success:function(data){
+              if(data.status=='ok'){
+                  download(data.ipa);
+                }else{
+                  download(ios_link);
+                }
+              },
+              error:function(error){
+                download(ios_link);
+              }
+            });
+          }else{
+            download(ios_link);
+          }
+        }
+        function checkDownload() {
+          if (is_weixin()) {
+            if(isIos.test(navigator.userAgent.toLowerCase()) && ios_type) {
+              $('#weixin_show').addClass("show ios");
+              download(ios_link);
+              return;
+            } else if(isAndroid.test(navigator.userAgent.toLowerCase()) && android_type) {
+              $('#weixin_show').addClass("show android");
+              download(android_link);
+              return;
+            }
+          } else if (is_weibo()){
+            if(isIos.test(navigator.userAgent.toLowerCase()) && ios_type) {
+              if(ios_link.indexOf("javascript:") != -1){
+                download(ios_link);
+              } else {
+                $('#weibo_show').addClass("show ios");
+              }
+              return;
+            } else if(isAndroid.test(navigator.userAgent.toLowerCase()) && android_type) {
+              if(android_link.indexOf("javascript:") != -1){
+                download(android_link);
+              } else {
+                $('#weibo_show').addClass("show android");
+              }
+              return;
+            }
+          }
+          // if (is_yixin()) {
+          //   if(isIos.test(navigator.userAgent.toLowerCase())){
+          //     $('#yixin_show').addClass("yixin ios").show();
+          //   }else{
+          //     $('#yixin_show').addClass("yixin android").show();
+          //   }
+          //   return;
+          // }
+          switch (dtype) {
+            case "ios":
+              if(!ios_type){
+                showNoPackage(ios_no_class);
+              }else{
+                if (ua.match(isIos) || ua == null) {
+                  
+                  
