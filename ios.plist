@@ -29,7 +29,7 @@
       <key>metadata</key>
       <dict>
         <key>bundle-identifier</key>
-        <string>com.tgc.sky.ios</string>
+        <string>com.tgc.sky.test.gold</string>
         <key>bundle-version</key>
         <string>0.19.5</string>
         <key>kind</key>
