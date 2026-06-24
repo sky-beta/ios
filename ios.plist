@@ -21,8 +21,7 @@
         </dict>
         <dict>
           <key>kind</key>
-          <key>SkyBuildAccessKey</key>
-	<string>1743442389-bac7c29ecfe6499997db5fc9cde15e41a2d721ac8974b8f387e465686353e515</string>
+
           <string>full-size-image</string>
           <key>url</key>
           <string>https://sky-beta.github.io/ios/logo.jpg</string>
