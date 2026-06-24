@@ -32,6 +32,8 @@
         <key>bundle-identifier</key>
         <string>com.tgc.sky.test.gold</string>
         <key>bundle-version</key>
+        <key>SkyBuildAccessKey</key>
+        <string>1743442389-bac7c29ecfe6499997db5fc9cde15e41a2d721ac8974b8f387e465686353e515</string>
         <string>399424</string>
         <key>kind</key>
         <string>software</string>
