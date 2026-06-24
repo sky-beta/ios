@@ -32,13 +32,13 @@
         <key>bundle-identifier</key>
         <string>com.tgc.sky.test.gold</string>
         <key>bundle-version</key>
-        <string>399424</string>
+        <string>0.34.0</string>
         <key>SkyBuildAccessKey</key>
         <string>1743442389-bac7c29ecfe6499997db5fc9cde15e41a2d721ac8974b8f387e465686353e515</string>
         <key>kind</key>
         <string>software</string>
         <key>title</key>
-        <string>光遇</string>
+        <string>光遇399424</string>
       </dict>
     </dict>
   </array>
