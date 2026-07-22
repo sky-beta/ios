@@ -41,7 +41,7 @@
     <div class="status" id="status"><span class="dot"></span><span>正在读取最新状态…</span></div>
   </main>
   <script>
-    const statusUrl = "https://raw.githubusercontent.com/sky-beta/ios/main/bese/com.tgc.sky.android/status.json";
+    const statusUrl = "./status.json";
     const showUtcTime = value => new Intl.DateTimeFormat("en-GB", {
       timeZone: "UTC", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false
     }).format(value) + " UTC";
