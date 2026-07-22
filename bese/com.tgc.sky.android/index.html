@@ -18,6 +18,7 @@
     .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 24px; }
     a.button { display: grid; place-items: center; min-height: 52px; padding: 12px 16px; border-radius: 14px; color: #07111f; background: #79c8ff; font-weight: 800; text-decoration: none; }
     a.huawei { color: #fff; background: #cf0a2c; }
+    a[aria-disabled="true"] { opacity: .55; pointer-events: none; }
     .status { display: flex; align-items: center; gap: 8px; margin-top: 18px; color: #8fa8c1; font-size: 14px; }
     .dot { width: 9px; height: 9px; border-radius: 50%; background: #ffc857; box-shadow: 0 0 14px currentColor; }
     .ready .dot { background: #4ade80; }
@@ -29,25 +30,25 @@
     <h1>光·遇 APK 下载</h1>
     <p class="package">com.tgc.sky.android</p>
     <dl>
-      <dt>当前时间</dt><dd id="current-time">--:--:-- UTC</dd>
-      <dt>最后检查</dt><dd id="last-checked">11:14:39 UTC</dd>
+      <dt>当前时间</dt><dd id="current-time">--:--:-- 北京时间</dd>
+      <dt>最后检查</dt><dd id="last-checked">--:--:-- 北京时间</dd>
       <dt>版本</dt><dd id="version">0.34.1</dd>
       <dt>Version Code</dt><dd id="version-code">404272</dd>
     </dl>
     <div class="actions">
       <a class="button" href="https://github.com/sky-beta/ios/releases/download/apkeep-com.tgc.sky.android/com.tgc.sky.android.apk">Google Play 下载</a>
-      <a class="button huawei" href="https://appgallery.cloud.huawei.com/appdl/C105091411">华为下载</a>
+      <a id="huawei-download" class="button huawei" href="#" aria-disabled="true">华为下载</a>
     </div>
     <div class="status" id="status"><span class="dot"></span><span>正在读取最新状态…</span></div>
   </main>
   <script>
     const statusUrl = "./status.json";
-    const showUtcTime = value => new Intl.DateTimeFormat("en-GB", {
-      timeZone: "UTC", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false
-    }).format(value) + " UTC";
+    const showBeijingTime = value => new Intl.DateTimeFormat("zh-CN", {
+      timeZone: "Asia/Shanghai", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false
+    }).format(value) + " 北京时间";
 
     function updateClock() {
-      document.querySelector("#current-time").textContent = showUtcTime(new Date());
+      document.querySelector("#current-time").textContent = showBeijingTime(new Date());
     }
 
     async function updateReleaseInfo() {
@@ -58,7 +59,12 @@
         const data = await response.json();
         if (data.version) document.querySelector("#version").textContent = data.version;
         if (data.version_code) document.querySelector("#version-code").textContent = data.version_code;
-        if (data.last_checked) document.querySelector("#last-checked").textContent = showUtcTime(new Date(data.last_checked));
+        if (data.last_checked) document.querySelector("#last-checked").textContent = showBeijingTime(new Date(data.last_checked));
+        if (data.huawei_download_url) {
+          const huaweiDownload = document.querySelector("#huawei-download");
+          huaweiDownload.href = data.huawei_download_url;
+          huaweiDownload.removeAttribute("aria-disabled");
+        }
         status.classList.add("ready");
         status.querySelector("span:last-child").textContent = "状态已同步";
       } catch (error) {
