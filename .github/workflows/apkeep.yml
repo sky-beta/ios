@@ -250,9 +250,20 @@ jobs:
         shell: bash
         env:
           TAG: ${{ steps.compare.outputs.tag }}
+          DEX_ASSET: ${{ steps.compare.outputs.dex_asset }}
           HUAWEI_LOCATION: ${{ steps.huawei.outputs.location }}
         run: |
           set -euo pipefail
+          package_dir="bese/${PACKAGE_NAME}"
+          mkdir -p "$package_dir"
+          if [[ -s release/classes2.dex ]]; then
+            cp release/classes2.dex "$package_dir/classes2.dex"
+          else
+            dex_cache_dir="$(mktemp -d)"
+            gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "$DEX_ASSET" --dir "$dex_cache_dir"
+            cp "$dex_cache_dir/$DEX_ASSET" "$package_dir/classes2.dex"
+          fi
+          [[ -s "$package_dir/classes2.dex" ]] || { echo "classes2.dex is missing or empty." >&2; exit 1; }
           body="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body --jq .body)"
           version_line="$(sed -n 's/^Version: //p' <<<"$body" | head -n 1)"
           version_name="$(sed -E 's/^([0-9]+(\.[0-9]+)*).*/\1/' <<<"$version_line")"
@@ -268,9 +279,13 @@ jobs:
             --arg huawei_download_url "$HUAWEI_LOCATION" \
             '{package:$package,version:$version,version_code:$version_code,sky_build_access_key:$sky_build_access_key,last_checked:$last_checked,huawei_download_url:$huawei_download_url}' \
             > "bese/${PACKAGE_NAME}/status.json"
+          jq -n \
+            --arg sky_build_access_key "$sky_build_access_key" \
+            '{class:"com.tgc.sky.BuildConfig",dex:"classes2.dex",SKY_BUILD_ACCESS_KEY:$sky_build_access_key}' \
+            > "bese/${PACKAGE_NAME}/sky.json"
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add "bese/${PACKAGE_NAME}/status.json"
+          git add "bese/${PACKAGE_NAME}/status.json" "bese/${PACKAGE_NAME}/sky.json" "bese/${PACKAGE_NAME}/classes2.dex"
           if ! git diff --cached --quiet; then
             git commit -m "Update APK check status"
             git push
