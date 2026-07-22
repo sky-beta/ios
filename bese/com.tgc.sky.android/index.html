@@ -41,7 +41,7 @@
     <div class="status" id="status"><span class="dot"></span><span>正在读取最新状态…</span></div>
   </main>
   <script>
-    const releaseApi = "https://api.github.com/repos/sky-beta/ios/releases/tags/apkeep-com.tgc.sky.android";
+    const statusUrl = "https://raw.githubusercontent.com/sky-beta/ios/main/bese/com.tgc.sky.android/status.json";
     const showUtcTime = value => new Intl.DateTimeFormat("en-GB", {
       timeZone: "UTC", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false
     }).format(value) + " UTC";
@@ -53,16 +53,12 @@
     async function updateReleaseInfo() {
       const status = document.querySelector("#status");
       try {
-        const response = await fetch(releaseApi, { cache: "no-store" });
-        if (!response.ok) throw new Error(`GitHub API ${response.status}`);
-        const release = await response.json();
-        const body = release.body || "";
-        const version = body.match(/^Version:\s*([0-9]+(?:\.[0-9]+)*)/m);
-        const versionCode = body.match(/^Version:.*?\((\d+)\)/m);
-        const lastChecked = body.match(/^Last checked:\s*(.+)$/m);
-        if (version) document.querySelector("#version").textContent = version[1];
-        if (versionCode) document.querySelector("#version-code").textContent = versionCode[1];
-        if (lastChecked) document.querySelector("#last-checked").textContent = showUtcTime(new Date(lastChecked[1].trim()));
+        const response = await fetch(`${statusUrl}?t=${Date.now()}`, { cache: "no-store" });
+        if (!response.ok) throw new Error(`Status ${response.status}`);
+        const data = await response.json();
+        if (data.version) document.querySelector("#version").textContent = data.version;
+        if (data.version_code) document.querySelector("#version-code").textContent = data.version_code;
+        if (data.last_checked) document.querySelector("#last-checked").textContent = showUtcTime(new Date(data.last_checked));
         status.classList.add("ready");
         status.querySelector("span:last-child").textContent = "状态已同步";
       } catch (error) {
