@@ -10,21 +10,29 @@ on:
       source:
         description: "Download source"
         required: true
-        default: apk-pure
+        default: google-play
         type: choice
         options:
+          - google-play
           - apk-pure
           - f-droid
-          - google-play
           - huawei-app-gallery
+      publish_release:
+        description: "Publish a direct APK download"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   download:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
+    concurrency:
+      group: apkeep-${{ inputs.app_id }}
+      cancel-in-progress: false
     env:
       APP_ID: ${{ inputs.app_id }}
       SOURCE: ${{ inputs.source }}
@@ -33,7 +41,7 @@ jobs:
 
     steps:
       - name: Prepare output directory
-        run: mkdir -p downloads
+        run: mkdir -p downloads release
 
       - name: Validate inputs
         shell: bash
@@ -69,11 +77,41 @@ jobs:
       - name: List downloaded files
         run: find downloads -maxdepth 2 -type f -printf '%P\n'
 
-      - name: Upload APK artifact
+      - name: Prepare direct APK
+        if: ${{ inputs.publish_release }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk_file="$(find downloads -type f -iname '*.apk' -print -quit)"
+          if [[ -z "$apk_file" ]]; then
+            echo "APKeep did not produce an APK file." >&2
+            exit 1
+          fi
+          cp "$apk_file" "release/${APP_ID}.apk"
+
+      - name: Publish direct APK download
+        if: ${{ inputs.publish_release }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tag="apkeep-${APP_ID}"
+          if ! gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$tag" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "APKeep: ${APP_ID}" \
+              --notes "Direct APK downloaded from Google Play by APKeep."
+          fi
+          gh release upload "$tag" "release/${APP_ID}.apk" \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
+
+      - name: Upload workflow artifact
+        if: ${{ !inputs.publish_release }}
         uses: actions/upload-artifact@v4
         with:
           name: apkeep-download
           path: downloads/
           if-no-files-found: error
           retention-days: 7
-
