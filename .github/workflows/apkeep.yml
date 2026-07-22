@@ -186,6 +186,7 @@ jobs:
         shell: bash
         env:
           TAG: ${{ steps.compare.outputs.tag }}
+          HUAWEI_LOCATION: ${{ steps.huawei.outputs.location }}
         run: |
           set -euo pipefail
           body="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body --jq .body)"
@@ -198,7 +199,7 @@ jobs:
             --arg version "$version_name" \
             --arg version_code "$version_code" \
             --arg last_checked "$last_checked" \
-            --arg huawei_download_url "$HUAWEI_APP_URL" \
+            --arg huawei_download_url "$HUAWEI_LOCATION" \
             '{package:$package,version:$version,version_code:$version_code,last_checked:$last_checked,huawei_download_url:$huawei_download_url}' \
             > "bese/${PACKAGE_NAME}/status.json"
           git config user.name github-actions[bot]
