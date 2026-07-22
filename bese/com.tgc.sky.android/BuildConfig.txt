@@ -1,0 +1,26 @@
+package com.tgc.sky;
+
+/* loaded from: /home/runner/work/ios/ios/release/classes2.dex */
+public final class BuildConfig {
+    public static final String APPLICATION_ID = "com.tgc.sky.android";
+    public static final String BUILD_TYPE = "gold";
+    public static final boolean DEBUG = false;
+    public static final String FLAVOR = "liveAppstore";
+    public static final String FLAVOR_stage = "live";
+    public static final String FLAVOR_target = "appstore";
+    public static final String HELPSHIFT_API_KEY = "d809955e4ed822149fa55845a20ecf36";
+    public static final String HELPSHIFT_APP_ID = "thatgamecompany_platform_20190716045358602-1072415bc961149";
+    public static final String HELPSHIFT_DOMAIN = "thatgamecompany.helpshift.com";
+    public static final String NINTENDO_PW = "";
+    public static final String NINTENDO_USER = "";
+    public static final String PLATFORM = "android";
+    public static final String SKY_BRANCH_NAME = "Live";
+    public static final String SKY_BUILD_ACCESS_KEY = "1743442606-1b1875c0b7dbca5adb30a2a9ffd7bef041f7a387db2cb4c19b4bb48e3d6023af";
+    public static final boolean SKY_ENABLE_GAMEPAD_ASSETS = true;
+    public static final boolean SKY_ENABLE_ODR = true;
+    public static final String SKY_SERVER_HOSTNAME = "live.radiance.thatgamecompany.com";
+    public static final String SKY_STAGE_NAME = "Live";
+    public static final String SKY_VERSION = "0.34.1";
+    public static final int VERSION_CODE = 404272;
+    public static final String VERSION_NAME = "0.34.1 (404272)";
+}
