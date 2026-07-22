@@ -96,8 +96,14 @@ jobs:
           tag="apkeep-${PACKAGE_NAME}"
           asset="${PACKAGE_NAME}.apk"
           changed=true
+          has_build_access_key=false
+          sky_build_access_key=""
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json body,assets > current-release.json 2>/dev/null; then
             old_location="$(jq -r '.body' current-release.json | sed -n 's/^Huawei redirect: //p' | tail -n 1)"
+            sky_build_access_key="$(jq -r '.body' current-release.json | sed -n 's/^SKY_BUILD_ACCESS_KEY: //p' | tail -n 1)"
+            if [[ "$sky_build_access_key" =~ ^[0-9]{10}-[0-9a-fA-F]{64}$ ]]; then
+              has_build_access_key=true
+            fi
             asset_exists="$(jq -r --arg name "$asset" '[.assets[] | select(.name == $name)] | length' current-release.json)"
             if [[ "$old_location" == "$HUAWEI_LOCATION" && "$asset_exists" == "1" ]]; then
               changed=false
@@ -106,6 +112,12 @@ jobs:
           echo "changed=$changed" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "asset=$asset" >> "$GITHUB_OUTPUT"
+          echo "has_build_access_key=$has_build_access_key" >> "$GITHUB_OUTPUT"
+          {
+            echo 'sky_build_access_key<<EXISTING_SKY_BUILD_ACCESS_KEY_EOF'
+            echo "$sky_build_access_key"
+            echo 'EXISTING_SKY_BUILD_ACCESS_KEY_EOF'
+          } >> "$GITHUB_OUTPUT"
 
       - name: Download from Google Play
         if: steps.compare.outputs.changed == 'true'
@@ -146,6 +158,46 @@ jobs:
           echo "version_code=${version_code:-unknown}" >> "$GITHUB_OUTPUT"
           echo "sha256=$(sha256sum "release/${PACKAGE_NAME}.apk" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
 
+      - name: Retrieve cached APK for metadata
+        if: steps.compare.outputs.changed != 'true' && steps.compare.outputs.has_build_access_key != 'true'
+        shell: bash
+        env:
+          TAG: ${{ steps.compare.outputs.tag }}
+          ASSET: ${{ steps.compare.outputs.asset }}
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "$ASSET" --dir release
+
+      - name: Read SKY_BUILD_ACCESS_KEY from BuildConfig
+        if: steps.compare.outputs.changed == 'true' || steps.compare.outputs.has_build_access_key != 'true'
+        id: build_config
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="release/${PACKAGE_NAME}.apk"
+          unzip -p "$apk" classes2.dex > release/classes2.dex
+          strings -a release/classes2.dex > release/classes2.strings
+          grep -Fxq 'Lcom/tgc/sky/BuildConfig;' release/classes2.strings || {
+            echo 'Missing Lcom/tgc/sky/BuildConfig; in classes2.dex.' >&2
+            exit 1
+          }
+          grep -Fxq 'SKY_BUILD_ACCESS_KEY' release/classes2.strings || {
+            echo 'Missing SKY_BUILD_ACCESS_KEY in classes2.dex.' >&2
+            exit 1
+          }
+          matches="$(grep -oE '[0-9]{10}-[0-9a-fA-F]{64}' release/classes2.strings | sort -u)"
+          match_count="$(grep -c . <<<"$matches" || true)"
+          [[ "$match_count" == "1" ]] || {
+            echo "Expected one BuildConfig access key, found $match_count." >&2
+            exit 1
+          }
+          {
+            echo 'sky_build_access_key<<SKY_BUILD_ACCESS_KEY_EOF'
+            echo "$matches"
+            echo 'SKY_BUILD_ACCESS_KEY_EOF'
+          } >> "$GITHUB_OUTPUT"
+
       - name: Overwrite GitHub release asset
         if: steps.compare.outputs.changed == 'true'
         shell: bash
@@ -170,15 +222,20 @@ jobs:
         shell: bash
         env:
           TAG: ${{ steps.compare.outputs.tag }}
+          SKY_BUILD_ACCESS_KEY: ${{ steps.build_config.outputs.sky_build_access_key || steps.compare.outputs.sky_build_access_key }}
         run: |
           set -euo pipefail
           checked_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
           body="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body --jq .body)"
-          updated_body="$(awk -v checked="Last checked: $checked_at" '
-            BEGIN { found=0 }
-            /^Last checked: / { print checked; found=1; next }
+          updated_body="$(awk -v checked="Last checked: $checked_at" -v access_key="SKY_BUILD_ACCESS_KEY: $SKY_BUILD_ACCESS_KEY" '
+            BEGIN { checked_found=0; key_found=0 }
+            /^Last checked: / { print checked; checked_found=1; next }
+            /^SKY_BUILD_ACCESS_KEY: / { print access_key; key_found=1; next }
             { print }
-            END { if (!found) print checked }
+            END {
+              if (!key_found) print access_key
+              if (!checked_found) print checked
+            }
           ' <<<"$body")"
           gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes "$updated_body"
 
@@ -194,13 +251,15 @@ jobs:
           version_name="$(sed -E 's/^([0-9]+(\.[0-9]+)*).*/\1/' <<<"$version_line")"
           version_code="$(sed -n -E 's/.*\(([0-9]+)\).*/\1/p' <<<"$version_line" | head -n 1)"
           last_checked="$(sed -n 's/^Last checked: //p' <<<"$body" | head -n 1)"
+          sky_build_access_key="$(sed -n 's/^SKY_BUILD_ACCESS_KEY: //p' <<<"$body" | head -n 1)"
           jq -n \
             --arg package "$PACKAGE_NAME" \
             --arg version "$version_name" \
             --arg version_code "$version_code" \
             --arg last_checked "$last_checked" \
+            --arg sky_build_access_key "$sky_build_access_key" \
             --arg huawei_download_url "$HUAWEI_LOCATION" \
-            '{package:$package,version:$version,version_code:$version_code,last_checked:$last_checked,huawei_download_url:$huawei_download_url}' \
+            '{package:$package,version:$version,version_code:$version_code,sky_build_access_key:$sky_build_access_key,last_checked:$last_checked,huawei_download_url:$huawei_download_url}' \
             > "bese/${PACKAGE_NAME}/status.json"
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
