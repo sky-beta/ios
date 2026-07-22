@@ -296,7 +296,11 @@ jobs:
           version_line="$(sed -n 's/^Version: //p' <<<"$body" | head -n 1)"
           version_name="$(sed -E 's/^([0-9]+(\.[0-9]+)*).*/\1/' <<<"$version_line")"
           version_code="$(sed -n -E 's/.*\(([0-9]+)\).*/\1/p' <<<"$version_line" | head -n 1)"
-          last_checked="$(sed -n 's/^Last checked: //p' <<<"$body" | head -n 1)"
+          last_checked_utc="$(sed -n 's/^Last checked: //p' <<<"$body" | head -n 1)"
+          last_checked=""
+          if [[ -n "$last_checked_utc" ]]; then
+            last_checked="$(TZ=Asia/Shanghai date -d "$last_checked_utc" '+%Y-%m-%dT%H:%M:%S%:z')"
+          fi
           sky_build_access_key="$(sed -n 's/^SKY_BUILD_ACCESS_KEY: //p' <<<"$body" | head -n 1)"
           jq -n \
             --arg package "$PACKAGE_NAME" \
