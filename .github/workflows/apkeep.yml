@@ -96,6 +96,7 @@ jobs:
           tag="apkeep-${PACKAGE_NAME}"
           asset="${PACKAGE_NAME}.apk"
           dex_asset="classes2.dex"
+          buildconfig_asset="BuildConfig.txt"
           changed=true
           has_build_access_key=false
           sky_build_access_key=""
@@ -107,7 +108,8 @@ jobs:
             fi
             asset_exists="$(jq -r --arg name "$asset" '[.assets[] | select(.name == $name)] | length' current-release.json)"
             dex_asset_exists="$(jq -r --arg name "$dex_asset" '[.assets[] | select(.name == $name)] | length' current-release.json)"
-            if [[ "$old_location" == "$HUAWEI_LOCATION" && "$asset_exists" == "1" && "$dex_asset_exists" == "1" ]]; then
+            buildconfig_asset_exists="$(jq -r --arg name "$buildconfig_asset" '[.assets[] | select(.name == $name)] | length' current-release.json)"
+            if [[ "$old_location" == "$HUAWEI_LOCATION" && "$asset_exists" == "1" && "$dex_asset_exists" == "1" && "$buildconfig_asset_exists" == "1" ]]; then
               changed=false
             fi
           fi
@@ -115,6 +117,7 @@ jobs:
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "asset=$asset" >> "$GITHUB_OUTPUT"
           echo "dex_asset=$dex_asset" >> "$GITHUB_OUTPUT"
+          echo "buildconfig_asset=$buildconfig_asset" >> "$GITHUB_OUTPUT"
           echo "has_build_access_key=$has_build_access_key" >> "$GITHUB_OUTPUT"
           {
             echo 'sky_build_access_key<<EXISTING_SKY_BUILD_ACCESS_KEY_EOF'
@@ -204,6 +207,18 @@ jobs:
             echo 'SKY_BUILD_ACCESS_KEY_EOF'
           } >> "$GITHUB_OUTPUT"
 
+      - name: Decompile tgc.sky.BuildConfig to TXT
+        if: steps.compare.outputs.changed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          jadx_version="1.5.3"
+          curl -fsSL "https://github.com/skylot/jadx/releases/download/v${jadx_version}/jadx-${jadx_version}.zip" -o /tmp/jadx.zip
+          unzip -q /tmp/jadx.zip -d /tmp/jadx
+          mkdir -p /tmp/buildconfig
+          /tmp/jadx/bin/jadx --single-class tgc.sky.BuildConfig --single-class-output release/BuildConfig.txt release/classes2.dex
+          [[ -s release/BuildConfig.txt ]] || { echo "Failed to decompile tgc.sky.BuildConfig." >&2; exit 1; }
+
       - name: Overwrite GitHub release asset
         if: steps.compare.outputs.changed == 'true'
         shell: bash
@@ -212,6 +227,7 @@ jobs:
           TAG: ${{ steps.compare.outputs.tag }}
           ASSET: ${{ steps.compare.outputs.asset }}
           DEX_ASSET: ${{ steps.compare.outputs.dex_asset }}
+          BUILDCONFIG_ASSET: ${{ steps.compare.outputs.buildconfig_asset }}
           VERSION_NAME: ${{ steps.package.outputs.version_name }}
           VERSION_CODE: ${{ steps.package.outputs.version_code }}
           SHA256: ${{ steps.package.outputs.sha256 }}
@@ -220,7 +236,7 @@ jobs:
           if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "$PACKAGE_NAME" --notes "Preparing Google Play download."
           fi
-          gh release upload "$TAG" "release/$ASSET" "release/$DEX_ASSET" --repo "$GITHUB_REPOSITORY" --clobber
+          gh release upload "$TAG" "release/$ASSET" "release/$DEX_ASSET" "release/$BUILDCONFIG_ASSET" --repo "$GITHUB_REPOSITORY" --clobber
           checked_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
           notes="$(printf 'Google Play APK cached by APKeep.\n\nPackage: %s\nFilename: %s\nVersion: %s (%s)\nSHA256: %s\nHuawei redirect: %s\nLast checked: %s\nRequest ID: %s\n' "$PACKAGE_NAME" "$ASSET" "$VERSION_NAME" "$VERSION_CODE" "$SHA256" "$HUAWEI_LOCATION" "$checked_at" '${{ inputs.request_id }}')"
           gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --title "$PACKAGE_NAME" --notes "$notes"
@@ -309,4 +325,3 @@ jobs:
             echo "- classes2.dex: [$dex_url]($dex_url)"
           } >> "$GITHUB_STEP_SUMMARY"
           echo "$url"
-
