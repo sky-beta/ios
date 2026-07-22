@@ -1,6 +1,8 @@
 name: Download com.tgc.sky.android from Google Play
 
 on:
+  schedule:
+    - cron: "17 * * * *"
   workflow_dispatch:
     inputs:
       app_id:
@@ -56,14 +58,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          [[ "${{ inputs.app_id }}" == "$PACKAGE_NAME" ]] || {
-            echo "Only $PACKAGE_NAME is allowed." >&2
-            exit 1
-          }
-          [[ "${{ inputs.source }}" == "google-play" ]] || {
-            echo "Only Google Play is allowed." >&2
-            exit 1
-          }
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            [[ "${{ inputs.app_id }}" == "$PACKAGE_NAME" ]] || {
+              echo "Only $PACKAGE_NAME is allowed." >&2
+              exit 1
+            }
+            [[ "${{ inputs.source }}" == "google-play" ]] || {
+              echo "Only Google Play is allowed." >&2
+              exit 1
+            }
+          fi
           for name in GOOGLE_PLAY_EMAIL GOOGLE_PLAY_AAS_TOKEN GH_TOKEN HUAWEI_APP_URL; do
             [[ -n "${!name:-}" ]] || { echo "Missing secret: $name" >&2; exit 1; }
           done
