@@ -3,12 +3,78 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta http-equiv="refresh" content="0;url=https://base.3585243832.workers.dev/base/com.tgc.sky.android">
-  <title>正在获取 Google Play APK</title>
+  <meta name="color-scheme" content="dark">
+  <title>光·遇 APK 下载</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, "Noto Sans SC", system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    body { min-height: 100vh; margin: 0; display: grid; place-items: center; padding: 24px; color: #edf6ff; background: radial-gradient(circle at top, #24456f 0, #101c31 46%, #080d18 100%); }
+    main { width: min(560px, 100%); padding: 32px; border: 1px solid rgba(255,255,255,.14); border-radius: 24px; background: rgba(10,20,36,.76); box-shadow: 0 24px 70px rgba(0,0,0,.38); backdrop-filter: blur(18px); }
+    h1 { margin: 0 0 8px; font-size: clamp(28px, 7vw, 42px); }
+    .package { margin: 0 0 28px; color: #9eb3ca; font-family: ui-monospace, monospace; }
+    dl { display: grid; grid-template-columns: 110px 1fr; gap: 14px 18px; margin: 0; padding: 22px 0; border-block: 1px solid rgba(255,255,255,.1); }
+    dt { color: #91a8c0; }
+    dd { margin: 0; font-weight: 650; overflow-wrap: anywhere; }
+    .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 24px; }
+    a.button { display: grid; place-items: center; min-height: 52px; padding: 12px 16px; border-radius: 14px; color: #07111f; background: #79c8ff; font-weight: 800; text-decoration: none; }
+    a.huawei { color: #fff; background: #cf0a2c; }
+    .status { display: flex; align-items: center; gap: 8px; margin-top: 18px; color: #8fa8c1; font-size: 14px; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: #ffc857; box-shadow: 0 0 14px currentColor; }
+    .ready .dot { background: #4ade80; }
+    @media (max-width: 440px) { main { padding: 24px 20px; } dl { grid-template-columns: 1fr; gap: 5px; } dd { margin-bottom: 8px; } .actions { grid-template-columns: 1fr; } }
+  </style>
 </head>
 <body>
-  <p>正在检查华为版本并获取 Google Play 下载地址……</p>
-  <p><a href="https://base.3585243832.workers.dev/base/com.tgc.sky.android">继续下载</a></p>
-  <script>location.replace("https://base.3585243832.workers.dev/base/com.tgc.sky.android");</script>
+  <main>
+    <h1>光·遇 APK 下载</h1>
+    <p class="package">com.tgc.sky.android</p>
+    <dl>
+      <dt>当前时间</dt><dd id="current-time">--:--:-- UTC</dd>
+      <dt>最后检查</dt><dd id="last-checked">11:14:39 UTC</dd>
+      <dt>版本</dt><dd id="version">0.34.1</dd>
+      <dt>Version Code</dt><dd id="version-code">404272</dd>
+    </dl>
+    <div class="actions">
+      <a class="button" href="https://github.com/sky-beta/ios/releases/download/apkeep-com.tgc.sky.android/com.tgc.sky.android.apk">Google Play 下载</a>
+      <a class="button huawei" href="https://appgallery.cloud.huawei.com/appdl/C105091411">华为下载</a>
+    </div>
+    <div class="status" id="status"><span class="dot"></span><span>正在读取最新状态…</span></div>
+  </main>
+  <script>
+    const releaseApi = "https://api.github.com/repos/sky-beta/ios/releases/tags/apkeep-com.tgc.sky.android";
+    const showUtcTime = value => new Intl.DateTimeFormat("en-GB", {
+      timeZone: "UTC", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false
+    }).format(value) + " UTC";
+
+    function updateClock() {
+      document.querySelector("#current-time").textContent = showUtcTime(new Date());
+    }
+
+    async function updateReleaseInfo() {
+      const status = document.querySelector("#status");
+      try {
+        const response = await fetch(releaseApi, { cache: "no-store" });
+        if (!response.ok) throw new Error(`GitHub API ${response.status}`);
+        const release = await response.json();
+        const body = release.body || "";
+        const version = body.match(/^Version:\s*([0-9]+(?:\.[0-9]+)*)/m);
+        const versionCode = body.match(/^Version:.*?\((\d+)\)/m);
+        const lastChecked = body.match(/^Last checked:\s*(.+)$/m);
+        if (version) document.querySelector("#version").textContent = version[1];
+        if (versionCode) document.querySelector("#version-code").textContent = versionCode[1];
+        if (lastChecked) document.querySelector("#last-checked").textContent = showUtcTime(new Date(lastChecked[1].trim()));
+        status.classList.add("ready");
+        status.querySelector("span:last-child").textContent = "状态已同步";
+      } catch (error) {
+        status.querySelector("span:last-child").textContent = "暂时无法同步，已显示最近记录";
+        console.error(error);
+      }
+    }
+
+    updateClock();
+    setInterval(updateClock, 1000);
+    updateReleaseInfo();
+    setInterval(updateReleaseInfo, 300000);
+  </script>
 </body>
 </html>
