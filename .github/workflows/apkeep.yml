@@ -43,7 +43,7 @@ jobs:
       cancel-in-progress: false
     env:
       PACKAGE_NAME: com.tgc.sky.android
-      HUAWEI_APP_URL: https://appgallery.cloud.huawei.com/appdl/C105091411
+      HUAWEI_APP_URL: ${{ vars.HUAWEI_APP_URL }}
       GOOGLE_PLAY_EMAIL: ${{ secrets.GOOGLE_PLAY_EMAIL }}
       GOOGLE_PLAY_AAS_TOKEN: ${{ secrets.GOOGLE_PLAY_AAS_TOKEN }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -64,7 +64,7 @@ jobs:
             echo "Only Google Play is allowed." >&2
             exit 1
           }
-          for name in GOOGLE_PLAY_EMAIL GOOGLE_PLAY_AAS_TOKEN GH_TOKEN; do
+          for name in GOOGLE_PLAY_EMAIL GOOGLE_PLAY_AAS_TOKEN GH_TOKEN HUAWEI_APP_URL; do
             [[ -n "${!name:-}" ]] || { echo "Missing secret: $name" >&2; exit 1; }
           done
 
@@ -194,7 +194,8 @@ jobs:
             --arg version "$version_name" \
             --arg version_code "$version_code" \
             --arg last_checked "$last_checked" \
-            '{package:$package,version:$version,version_code:$version_code,last_checked:$last_checked}' \
+            --arg huawei_download_url "$HUAWEI_APP_URL" \
+            '{package:$package,version:$version,version_code:$version_code,last_checked:$last_checked,huawei_download_url:$huawei_download_url}' \
             > "bese/${PACKAGE_NAME}/status.json"
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
