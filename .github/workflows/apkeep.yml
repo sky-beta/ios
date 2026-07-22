@@ -22,6 +22,11 @@ on:
         required: false
         default: false
         type: boolean
+      request_id:
+        description: "Caller request identifier"
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: write
@@ -32,7 +37,7 @@ jobs:
     timeout-minutes: 30
     concurrency:
       group: apkeep-${{ inputs.app_id }}
-      cancel-in-progress: false
+      cancel-in-progress: true
     env:
       APP_ID: ${{ inputs.app_id }}
       SOURCE: ${{ inputs.source }}
@@ -97,15 +102,53 @@ jobs:
         run: |
           set -euo pipefail
           tag="apkeep-${APP_ID}"
+          asset_name="${APP_ID}.apk"
+          new_sha="$(sha256sum "release/$asset_name" | awk '{print $1}')"
+          new_digest="sha256:${new_sha}"
+
+          aapt_bin="$(command -v aapt || true)"
+          if [[ -z "$aapt_bin" && -n "${ANDROID_HOME:-}" ]]; then
+            aapt_bin="$(find "$ANDROID_HOME/build-tools" -type f -name aapt -print 2>/dev/null | sort -V | tail -n 1)"
+          fi
+
+          version_name="unknown"
+          version_code="unknown"
+          if [[ -n "$aapt_bin" ]]; then
+            badging="$($aapt_bin dump badging "release/$asset_name" 2>/dev/null | head -n 1 || true)"
+            parsed_name="$(sed -n "s/.*versionName='\([^']*\)'.*/\1/p" <<<"$badging")"
+            parsed_code="$(sed -n "s/.*versionCode='\([^']*\)'.*/\1/p" <<<"$badging")"
+            [[ -n "$parsed_name" ]] && version_name="$parsed_name"
+            [[ -n "$parsed_code" ]] && version_code="$parsed_code"
+          fi
+
+          changed=true
           if ! gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release create "$tag" \
               --repo "$GITHUB_REPOSITORY" \
               --title "APKeep: ${APP_ID}" \
-              --notes "Direct APK downloaded from Google Play by APKeep."
+              --notes "Preparing direct APK download."
+          else
+            gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${tag}" > current-release.json
+            old_digest="$(jq -r --arg name "$asset_name" '.assets[] | select(.name == $name) | .digest // empty' current-release.json)"
+            if [[ -n "$old_digest" && "$old_digest" == "$new_digest" ]]; then
+              changed=false
+            fi
           fi
-          gh release upload "$tag" "release/${APP_ID}.apk" \
+
+          if [[ "$changed" == true ]]; then
+            gh release upload "$tag" "release/$asset_name" \
+              --repo "$GITHUB_REPOSITORY" \
+              --clobber
+          fi
+
+          checked_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          state="already current"
+          [[ "$changed" == true ]] && state="updated"
+          notes="$(printf 'Direct APK downloaded from Google Play by APKeep.\n\nPackage: %s\nVersion: %s (%s)\nSHA256: %s\nState: %s\nLast checked: %s\nRequest ID: %s\n' "$APP_ID" "$version_name" "$version_code" "$new_sha" "$state" "$checked_at" '${{ inputs.request_id }}')"
+          gh release edit "$tag" \
             --repo "$GITHUB_REPOSITORY" \
-            --clobber
+            --title "APKeep: ${APP_ID}" \
+            --notes "$notes"
 
       - name: Upload workflow artifact
         if: ${{ !inputs.publish_release }}
