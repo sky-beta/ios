@@ -2,7 +2,7 @@ name: Download com.tgc.sky.android from Google Play
 
 on:
   schedule:
-    - cron: "17 * * * *"
+    - cron: "0 * * * *"
   workflow_dispatch:
     inputs:
       app_id:
@@ -267,6 +267,7 @@ jobs:
         env:
           TAG: ${{ steps.compare.outputs.tag }}
           DEX_ASSET: ${{ steps.compare.outputs.dex_asset }}
+          BUILDCONFIG_ASSET: ${{ steps.compare.outputs.buildconfig_asset }}
           HUAWEI_LOCATION: ${{ steps.huawei.outputs.location }}
         run: |
           set -euo pipefail
@@ -280,6 +281,14 @@ jobs:
             cp "$dex_cache_dir/$DEX_ASSET" "$package_dir/classes2.dex"
           fi
           [[ -s "$package_dir/classes2.dex" ]] || { echo "classes2.dex is missing or empty." >&2; exit 1; }
+          if [[ -s release/BuildConfig.txt ]]; then
+            cp release/BuildConfig.txt "$package_dir/BuildConfig.txt"
+          else
+            buildconfig_cache_dir="$(mktemp -d)"
+            gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "$BUILDCONFIG_ASSET" --dir "$buildconfig_cache_dir"
+            cp "$buildconfig_cache_dir/$BUILDCONFIG_ASSET" "$package_dir/BuildConfig.txt"
+          fi
+          [[ -s "$package_dir/BuildConfig.txt" ]] || { echo "BuildConfig.txt is missing or empty." >&2; exit 1; }
           body="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body --jq .body)"
           version_line="$(sed -n 's/^Version: //p' <<<"$body" | head -n 1)"
           version_name="$(sed -E 's/^([0-9]+(\.[0-9]+)*).*/\1/' <<<"$version_line")"
@@ -301,7 +310,7 @@ jobs:
             > "bese/${PACKAGE_NAME}/sky.json"
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add "bese/${PACKAGE_NAME}/status.json" "bese/${PACKAGE_NAME}/sky.json" "bese/${PACKAGE_NAME}/classes2.dex"
+          git add "bese/${PACKAGE_NAME}/status.json" "bese/${PACKAGE_NAME}/sky.json" "bese/${PACKAGE_NAME}/classes2.dex" "bese/${PACKAGE_NAME}/BuildConfig.txt"
           if ! git diff --cached --quiet; then
             git commit -m "Update APK check status"
             git push
@@ -313,6 +322,7 @@ jobs:
           set -euo pipefail
           url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${{ steps.compare.outputs.tag }}/${{ steps.compare.outputs.asset }}"
           dex_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${{ steps.compare.outputs.tag }}/${{ steps.compare.outputs.dex_asset }}"
+          buildconfig_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${{ steps.compare.outputs.tag }}/${{ steps.compare.outputs.buildconfig_asset }}"
           state="unchanged"
           [[ "${{ steps.compare.outputs.changed }}" == "true" ]] && state="updated"
           {
@@ -323,5 +333,6 @@ jobs:
             echo "- Huawei 302: \`${{ steps.huawei.outputs.location }}\`"
             echo "- APK: [$url]($url)"
             echo "- classes2.dex: [$dex_url]($dex_url)"
+            echo "- BuildConfig.txt: [$buildconfig_url]($buildconfig_url)"
           } >> "$GITHUB_STEP_SUMMARY"
           echo "$url"
