@@ -22,6 +22,9 @@
     .status { display: flex; align-items: center; gap: 8px; margin-top: 18px; color: #8fa8c1; font-size: 14px; }
     .dot { width: 9px; height: 9px; border-radius: 50%; background: #ffc857; box-shadow: 0 0 14px currentColor; }
     .ready .dot { background: #4ade80; }
+    .buildconfig { margin-top: 22px; }
+    .buildconfig h2 { margin: 0 0 10px; font-size: 18px; }
+    pre { max-height: 320px; margin: 0; padding: 16px; overflow: auto; border: 1px solid rgba(255,255,255,.1); border-radius: 14px; color: #c9e7ff; background: rgba(0,0,0,.28); font: 12px/1.55 ui-monospace, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
     @media (max-width: 440px) { main { padding: 24px 20px; } dl { grid-template-columns: 1fr; gap: 5px; } dd { margin-bottom: 8px; } .actions { grid-template-columns: 1fr; } }
   </style>
 </head>
@@ -30,8 +33,8 @@
     <h1>光·遇 APK 下载</h1>
     <p class="package">com.tgc.sky.android</p>
     <dl>
-      <dt>当前时间</dt><dd id="current-time">--:--:-- 北京时间</dd>
-      <dt>最后检查</dt><dd id="last-checked">--:--:-- 北京时间</dd>
+      <dt>当前时间</dt><dd id="current-time">--:--:-- UTC</dd>
+      <dt>最后检查</dt><dd id="last-checked">--:--:-- UTC</dd>
       <dt>版本</dt><dd id="version">0.34.1</dd>
       <dt>Version Code</dt><dd id="version-code">404272</dd>
     </dl>
@@ -40,15 +43,20 @@
       <a id="huawei-download" class="button huawei" href="#" aria-disabled="true">华为下载</a>
     </div>
     <div class="status" id="status"><span class="dot"></span><span>正在读取最新状态…</span></div>
+    <section class="buildconfig">
+      <h2>BuildConfig.txt</h2>
+      <pre id="buildconfig-content">正在读取 TXT 文件…</pre>
+    </section>
   </main>
   <script>
     const statusUrl = "./status.json";
-    const showBeijingTime = value => new Intl.DateTimeFormat("zh-CN", {
-      timeZone: "Asia/Shanghai", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false
-    }).format(value) + " 北京时间";
+    const buildConfigUrl = "./BuildConfig.txt";
+    const showUtcTime = value => new Intl.DateTimeFormat("en-GB", {
+      timeZone: "UTC", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false
+    }).format(value) + " UTC";
 
     function updateClock() {
-      document.querySelector("#current-time").textContent = showBeijingTime(new Date());
+      document.querySelector("#current-time").textContent = showUtcTime(new Date());
     }
 
     async function updateReleaseInfo() {
@@ -56,10 +64,13 @@
       try {
         const response = await fetch(`${statusUrl}?t=${Date.now()}`, { cache: "no-store" });
         if (!response.ok) throw new Error(`Status ${response.status}`);
+        const buildConfigResponse = await fetch(`${buildConfigUrl}?t=${Date.now()}`, { cache: "no-store" });
+        if (!buildConfigResponse.ok) throw new Error(`BuildConfig ${buildConfigResponse.status}`);
+        document.querySelector("#buildconfig-content").textContent = await buildConfigResponse.text();
         const data = await response.json();
         if (data.version) document.querySelector("#version").textContent = data.version;
         if (data.version_code) document.querySelector("#version-code").textContent = data.version_code;
-        if (data.last_checked) document.querySelector("#last-checked").textContent = showBeijingTime(new Date(data.last_checked));
+        if (data.last_checked) document.querySelector("#last-checked").textContent = showUtcTime(new Date(data.last_checked));
         if (data.huawei_download_url) {
           const huaweiDownload = document.querySelector("#huawei-download");
           huaweiDownload.href = data.huawei_download_url;
