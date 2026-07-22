@@ -95,6 +95,7 @@ jobs:
           set -euo pipefail
           tag="apkeep-${PACKAGE_NAME}"
           asset="${PACKAGE_NAME}.apk"
+          dex_asset="classes2.dex"
           changed=true
           has_build_access_key=false
           sky_build_access_key=""
@@ -105,13 +106,15 @@ jobs:
               has_build_access_key=true
             fi
             asset_exists="$(jq -r --arg name "$asset" '[.assets[] | select(.name == $name)] | length' current-release.json)"
-            if [[ "$old_location" == "$HUAWEI_LOCATION" && "$asset_exists" == "1" ]]; then
+            dex_asset_exists="$(jq -r --arg name "$dex_asset" '[.assets[] | select(.name == $name)] | length' current-release.json)"
+            if [[ "$old_location" == "$HUAWEI_LOCATION" && "$asset_exists" == "1" && "$dex_asset_exists" == "1" ]]; then
               changed=false
             fi
           fi
           echo "changed=$changed" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "asset=$asset" >> "$GITHUB_OUTPUT"
+          echo "dex_asset=$dex_asset" >> "$GITHUB_OUTPUT"
           echo "has_build_access_key=$has_build_access_key" >> "$GITHUB_OUTPUT"
           {
             echo 'sky_build_access_key<<EXISTING_SKY_BUILD_ACCESS_KEY_EOF'
@@ -146,6 +149,8 @@ jobs:
           [[ -n "$apk_file" ]] || apk_file="$(find downloads -type f -iname '*.apk' -print -quit)"
           [[ -n "$apk_file" ]] || { echo "APKeep did not produce an APK." >&2; exit 1; }
           cp "$apk_file" "release/${PACKAGE_NAME}.apk"
+          unzip -p "release/${PACKAGE_NAME}.apk" classes2.dex > release/classes2.dex
+          [[ -s release/classes2.dex ]] || { echo "classes2.dex is missing or empty." >&2; exit 1; }
 
           aapt_bin="$(find "${ANDROID_HOME}/build-tools" -type f -name aapt -print 2>/dev/null | sort -V | tail -n 1)"
           badging="$($aapt_bin dump badging "release/${PACKAGE_NAME}.apk" 2>/dev/null | head -n 1 || true)"
@@ -176,7 +181,8 @@ jobs:
         run: |
           set -euo pipefail
           apk="release/${PACKAGE_NAME}.apk"
-          unzip -p "$apk" classes2.dex > release/classes2.dex
+          [[ -s release/classes2.dex ]] || unzip -p "$apk" classes2.dex > release/classes2.dex
+          [[ -s release/classes2.dex ]] || { echo "classes2.dex is missing or empty." >&2; exit 1; }
           strings -a release/classes2.dex > release/classes2.strings
           grep -Fxq 'Lcom/tgc/sky/BuildConfig;' release/classes2.strings || {
             echo 'Missing Lcom/tgc/sky/BuildConfig; in classes2.dex.' >&2
@@ -205,6 +211,7 @@ jobs:
           HUAWEI_LOCATION: ${{ steps.huawei.outputs.location }}
           TAG: ${{ steps.compare.outputs.tag }}
           ASSET: ${{ steps.compare.outputs.asset }}
+          DEX_ASSET: ${{ steps.compare.outputs.dex_asset }}
           VERSION_NAME: ${{ steps.package.outputs.version_name }}
           VERSION_CODE: ${{ steps.package.outputs.version_code }}
           SHA256: ${{ steps.package.outputs.sha256 }}
@@ -213,7 +220,7 @@ jobs:
           if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "$PACKAGE_NAME" --notes "Preparing Google Play download."
           fi
-          gh release upload "$TAG" "release/$ASSET" --repo "$GITHUB_REPOSITORY" --clobber
+          gh release upload "$TAG" "release/$ASSET" "release/$DEX_ASSET" --repo "$GITHUB_REPOSITORY" --clobber
           checked_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
           notes="$(printf 'Google Play APK cached by APKeep.\n\nPackage: %s\nFilename: %s\nVersion: %s (%s)\nSHA256: %s\nHuawei redirect: %s\nLast checked: %s\nRequest ID: %s\n' "$PACKAGE_NAME" "$ASSET" "$VERSION_NAME" "$VERSION_CODE" "$SHA256" "$HUAWEI_LOCATION" "$checked_at" '${{ inputs.request_id }}')"
           gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --title "$PACKAGE_NAME" --notes "$notes"
@@ -274,6 +281,7 @@ jobs:
         run: |
           set -euo pipefail
           url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${{ steps.compare.outputs.tag }}/${{ steps.compare.outputs.asset }}"
+          dex_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${{ steps.compare.outputs.tag }}/${{ steps.compare.outputs.dex_asset }}"
           state="unchanged"
           [[ "${{ steps.compare.outputs.changed }}" == "true" ]] && state="updated"
           {
@@ -282,7 +290,8 @@ jobs:
             echo "- Package: \`$PACKAGE_NAME\`"
             echo "- State: $state"
             echo "- Huawei 302: \`${{ steps.huawei.outputs.location }}\`"
-            echo "- Download: [$url]($url)"
+            echo "- APK: [$url]($url)"
+            echo "- classes2.dex: [$dex_url]($dex_url)"
           } >> "$GITHUB_STEP_SUMMARY"
           echo "$url"
 
