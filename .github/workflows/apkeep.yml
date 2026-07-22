@@ -1,0 +1,79 @@
+name: Download APK with APKeep
+
+on:
+  workflow_dispatch:
+    inputs:
+      app_id:
+        description: "Android package name, optionally with @version"
+        required: true
+        type: string
+      source:
+        description: "Download source"
+        required: true
+        default: apk-pure
+        type: choice
+        options:
+          - apk-pure
+          - f-droid
+          - google-play
+          - huawei-app-gallery
+
+permissions:
+  contents: read
+
+jobs:
+  download:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      APP_ID: ${{ inputs.app_id }}
+      SOURCE: ${{ inputs.source }}
+      GOOGLE_PLAY_EMAIL: ${{ secrets.GOOGLE_PLAY_EMAIL }}
+      GOOGLE_PLAY_AAS_TOKEN: ${{ secrets.GOOGLE_PLAY_AAS_TOKEN }}
+
+    steps:
+      - name: Prepare output directory
+        run: mkdir -p downloads
+
+      - name: Validate inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$APP_ID" =~ ^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)+(@[A-Za-z0-9._+-]+)?$ ]]; then
+            echo "Invalid app ID: $APP_ID" >&2
+            exit 1
+          fi
+
+          if [[ "$SOURCE" == "google-play" ]]; then
+            if [[ -z "$GOOGLE_PLAY_EMAIL" || -z "$GOOGLE_PLAY_AAS_TOKEN" ]]; then
+              echo "Google Play requires GOOGLE_PLAY_EMAIL and GOOGLE_PLAY_AAS_TOKEN secrets." >&2
+              exit 1
+            fi
+          fi
+
+      - name: Download APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=(-a "$APP_ID" -d "$SOURCE")
+
+          if [[ "$SOURCE" == "google-play" ]]; then
+            args+=(-e "$GOOGLE_PLAY_EMAIL" -t "$GOOGLE_PLAY_AAS_TOKEN")
+          fi
+
+          docker run --rm \
+            --volume "$PWD/downloads:/output" \
+            ghcr.io/efforg/apkeep:stable \
+            "${args[@]}" /output
+
+      - name: List downloaded files
+        run: find downloads -maxdepth 2 -type f -printf '%P\n'
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: apkeep-download
+          path: downloads/
+          if-no-files-found: error
+          retention-days: 7
+
