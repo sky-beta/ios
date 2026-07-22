@@ -27,6 +27,11 @@ on:
         required: false
         default: ""
         type: string
+      version_probe:
+        description: "External version fingerprint"
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: write
@@ -144,7 +149,7 @@ jobs:
           checked_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
           state="already current"
           [[ "$changed" == true ]] && state="updated"
-          notes="$(printf 'Direct APK downloaded from Google Play by APKeep.\n\nPackage: %s\nVersion: %s (%s)\nSHA256: %s\nState: %s\nLast checked: %s\nRequest ID: %s\n' "$APP_ID" "$version_name" "$version_code" "$new_sha" "$state" "$checked_at" '${{ inputs.request_id }}')"
+          notes="$(printf 'Direct APK downloaded from Google Play by APKeep.\n\nPackage: %s\nVersion: %s (%s)\nSHA256: %s\nState: %s\nLast checked: %s\nRequest ID: %s\nVersion probe: %s\n' "$APP_ID" "$version_name" "$version_code" "$new_sha" "$state" "$checked_at" '${{ inputs.request_id }}' '${{ inputs.version_probe }}')"
           gh release edit "$tag" \
             --repo "$GITHUB_REPOSITORY" \
             --title "APKeep: ${APP_ID}" \
