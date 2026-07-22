@@ -49,6 +49,9 @@ jobs:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
+      - name: Check out Pages source
+        uses: actions/checkout@v4
+
       - name: Validate fixed configuration
         shell: bash
         run: |
@@ -174,6 +177,32 @@ jobs:
             END { if (!found) print checked }
           ' <<<"$body")"
           gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes "$updated_body"
+
+      - name: Update Pages status data
+        shell: bash
+        env:
+          TAG: ${{ steps.compare.outputs.tag }}
+        run: |
+          set -euo pipefail
+          body="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body --jq .body)"
+          version_line="$(sed -n 's/^Version: //p' <<<"$body" | head -n 1)"
+          version_name="$(sed -E 's/^([0-9]+(\.[0-9]+)*).*/\1/' <<<"$version_line")"
+          version_code="$(sed -n -E 's/.*\(([0-9]+)\).*/\1/p' <<<"$version_line" | head -n 1)"
+          last_checked="$(sed -n 's/^Last checked: //p' <<<"$body" | head -n 1)"
+          jq -n \
+            --arg package "$PACKAGE_NAME" \
+            --arg version "$version_name" \
+            --arg version_code "$version_code" \
+            --arg last_checked "$last_checked" \
+            '{package:$package,version:$version,version_code:$version_code,last_checked:$last_checked}' \
+            > "bese/${PACKAGE_NAME}/status.json"
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add "bese/${PACKAGE_NAME}/status.json"
+          if ! git diff --cached --quiet; then
+            git commit -m "Update APK check status"
+            git push
+          fi
 
       - name: Publish result
         shell: bash
