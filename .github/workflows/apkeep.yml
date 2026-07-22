@@ -207,7 +207,7 @@ jobs:
             echo 'SKY_BUILD_ACCESS_KEY_EOF'
           } >> "$GITHUB_OUTPUT"
 
-      - name: Decompile tgc.sky.BuildConfig to TXT
+      - name: Decompile com.tgc.sky.BuildConfig to TXT
         if: steps.compare.outputs.changed == 'true'
         shell: bash
         run: |
@@ -216,8 +216,8 @@ jobs:
           curl -fsSL "https://github.com/skylot/jadx/releases/download/v${jadx_version}/jadx-${jadx_version}.zip" -o /tmp/jadx.zip
           unzip -q /tmp/jadx.zip -d /tmp/jadx
           mkdir -p /tmp/buildconfig
-          /tmp/jadx/bin/jadx --single-class tgc.sky.BuildConfig --single-class-output release/BuildConfig.txt release/classes2.dex
-          [[ -s release/BuildConfig.txt ]] || { echo "Failed to decompile tgc.sky.BuildConfig." >&2; exit 1; }
+          /tmp/jadx/bin/jadx --single-class com.tgc.sky.BuildConfig --single-class-output release/BuildConfig.txt release/classes2.dex
+          [[ -s release/BuildConfig.txt ]] || { echo "Failed to decompile com.tgc.sky.BuildConfig." >&2; exit 1; }
 
       - name: Overwrite GitHub release asset
         if: steps.compare.outputs.changed == 'true'
