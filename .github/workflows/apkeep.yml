@@ -14,9 +14,6 @@ on:
         type: choice
         options:
           - google-play
-          - apk-pure
-          - f-droid
-          - huawei-app-gallery
       publish_release:
         description: "Publish a direct APK download"
         required: false
