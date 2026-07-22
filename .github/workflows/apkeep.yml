@@ -132,6 +132,9 @@ jobs:
           badging="$($aapt_bin dump badging "release/${PACKAGE_NAME}.apk" 2>/dev/null | head -n 1 || true)"
           version_name="$(sed -n "s/.*versionName='\([^']*\)'.*/\1/p" <<<"$badging")"
           version_code="$(sed -n "s/.*versionCode='\([^']*\)'.*/\1/p" <<<"$badging")"
+          if [[ -n "$version_code" ]]; then
+            version_name="$(sed -E "s/[[:space:]]*\\(${version_code}\\)[[:space:]]*$//" <<<"$version_name")"
+          fi
           echo "version_name=${version_name:-unknown}" >> "$GITHUB_OUTPUT"
           echo "version_code=${version_code:-unknown}" >> "$GITHUB_OUTPUT"
           echo "sha256=$(sha256sum "release/${PACKAGE_NAME}.apk" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
@@ -155,6 +158,22 @@ jobs:
           checked_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
           notes="$(printf 'Google Play APK cached by APKeep.\n\nPackage: %s\nFilename: %s\nVersion: %s (%s)\nSHA256: %s\nHuawei redirect: %s\nLast checked: %s\nRequest ID: %s\n' "$PACKAGE_NAME" "$ASSET" "$VERSION_NAME" "$VERSION_CODE" "$SHA256" "$HUAWEI_LOCATION" "$checked_at" '${{ inputs.request_id }}')"
           gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --title "$PACKAGE_NAME" --notes "$notes"
+
+      - name: Record successful check time
+        shell: bash
+        env:
+          TAG: ${{ steps.compare.outputs.tag }}
+        run: |
+          set -euo pipefail
+          checked_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          body="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body --jq .body)"
+          updated_body="$(awk -v checked="Last checked: $checked_at" '
+            BEGIN { found=0 }
+            /^Last checked: / { print checked; found=1; next }
+            { print }
+            END { if (!found) print checked }
+          ' <<<"$body")"
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes "$updated_body"
 
       - name: Publish result
         shell: bash
