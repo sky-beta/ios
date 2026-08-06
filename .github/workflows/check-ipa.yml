@@ -1,0 +1,64 @@
+name: Check IPA enterprise signature
+
+on:
+  workflow_dispatch:
+    inputs:
+      ipa_url:
+        description: 'IPA URL to check'
+        required: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download IPA
+        run: |
+          set -e
+          echo "Downloading ${{ github.event.inputs.ipa_url }}"
+          curl -fsSL --max-time 120 -o app.ipa "${{ github.event.inputs.ipa_url }}"
+          echo "DOWNLOAD_OK"
+
+      - name: Extract IPA
+        run: |
+          set -e
+          unzip -q app.ipa -d out || true
+          prov=$(find out -name embedded.mobileprovision | head -n1 || true)
+          if [ -z "$prov" ]; then
+            echo "NO_EMBEDDED_MOBILEPROVISION"
+            exit 0
+          fi
+          echo "FOUND_PROVISION:$prov"
+
+      - name: Parse embedded.mobileprovision
+        run: |
+          set -e
+          prov=$(find out -name embedded.mobileprovision | head -n1)
+          echo "PROVISION_FILE=$prov"
+          python3 - <<'PY'
+import plistlib,re,sys
+pfile=sys.argv[1]
+with open(pfile,'rb') as f:
+    data=f.read()
+m=re.search(b'(<\?xml.*</plist>)',data,re.S)
+if not m:
+    print('NO_XML_IN_PROVISION')
+    sys.exit(0)
+plist=m.group(1)
+p=plistlib.loads(plist)
+print('ProvisionsAllDevices:', p.get('ProvisionsAllDevices'))
+print('Name:', p.get('Name'))
+print('TeamName:', p.get('TeamName'))
+print('ExpirationDate:', p.get('ExpirationDate'))
+print('DeveloperCertificates count:', len(p.get('DeveloperCertificates', [])))
+PY
+
+      - name: Upload log as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: check-ipa-logs
+          path: |
+            out
