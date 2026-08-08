@@ -1,0 +1,35 @@
+name: Auto Sign IPA
+
+on:
+  push:
+    paths:
+      - 'quan.ipa'
+  workflow_dispatch: {}
+
+jobs:
+  sign:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ensure quan.ipa exists
+        run: |
+          if [ ! -f "quan.ipa" ]; then
+            echo "quan.ipa not found in repository root"; exit 1
+          fi
+
+      - name: Make resign script executable
+        run: chmod +x .github/scripts/resign.sh
+
+      - name: Run resign script
+        env:
+          CERT_ZIP_URL: ${{ secrets.CERT_ZIP_URL }}
+          CERT_PASSWORD: ${{ secrets.CERT_PASSWORD }}
+        run: .github/scripts/resign.sh
+
+      - name: Upload signed IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: signed-quan.ipa
+          path: signed-quan.ipa
