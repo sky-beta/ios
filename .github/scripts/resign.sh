@@ -20,14 +20,30 @@ if [ ! -f "$IPA" ]; then echo "quan.ipa not found at $IPA"; exit 1; fi
 mkdir -p "$WORKDIR/ipa"
 unzip -q "$IPA" -d "$WORKDIR/ipa"
 
-APP_PATH=$(ls "$WORKDIR/ipa/Payload"/*.app 2>/dev/null | head -n1 || true)
+# Find .app directory robustly
+APP_PATH=$(find "$WORKDIR/ipa/Payload" -maxdepth 3 -type d -name "*.app" -print -quit || true)
 if [ -z "$APP_PATH" ]; then echo "App bundle not found inside IPA"; exit 1; fi
 
+# Locate Info.plist (some IPAs may pack it differently)
 PLIST="$APP_PATH/Info.plist"
-if [ ! -f "$PLIST" ]; then echo "Info.plist not found in app bundle"; exit 1; fi
+if [ ! -f "$PLIST" ]; then
+  PLIST=$(find "$APP_PATH" -type f -name "Info.plist" -print -quit || true)
+fi
+if [ -z "$PLIST" ] || [ ! -f "$PLIST" ]; then
+  echo "Info.plist not found in app bundle"; exit 1
+fi
 
-BUNDLE_ID=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$PLIST")
-BUNDLE_VER=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$PLIST" 2>/dev/null || true)
+# Ensure plist is readable XML
+TMP_PLIST="$WORKDIR/Info.plist.xml"
+if plutil -convert xml1 -o "$TMP_PLIST" "$PLIST" 2>/dev/null; then
+  USE_PLIST="$TMP_PLIST"
+else
+  # fallback to original plist path
+  USE_PLIST="$PLIST"
+fi
+
+BUNDLE_ID=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$USE_PLIST")
+BUNDLE_VER=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$USE_PLIST" 2>/dev/null || true)
 
 echo "Bundle ID: $BUNDLE_ID"
 [ -n "$BUNDLE_VER" ] && echo "Bundle Version: $BUNDLE_VER"
