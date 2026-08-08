@@ -24,8 +24,8 @@ jobs:
 
       - name: Run resign script
         env:
-          CERT_ZIP_URL: "https://pub-6f7ffe944e2948a19530df1f8bd6fc9f.r2.dev/sky/aa1122.zip"
-          CERT_PASSWORD: "aa1122"
+          CERT_ZIP_URL: ${{ secrets.CERT_ZIP_URL }}
+          CERT_PASSWORD: ${{ secrets.CERT_PASSWORD }}
         run: .github/scripts/resign.sh
 
       - name: Upload signed IPA
