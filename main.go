@@ -3,11 +3,14 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -58,25 +61,170 @@ func main() {
 		http.Error(w, "github api unavailable", http.StatusBadGateway)
 	}
 
-	handler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		// If path is /account/ws, cache the header pair then proxy
+	// 使用 ServeMux 来同时提供签名 API 与代理功能
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/api/sign", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		signHandler(w, r)
+	})
+
+	mux.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
 		if req.URL.Path == "/account/ws" {
 			if err := cachePair(req); err != nil {
-				// 非致命：记录到 stderr，但继续转发请求并返回上游响应
 				fmt.Fprintln(os.Stderr, "cache error:", err)
 			}
 		}
-		// 对所有路径（包括 /account/ws）原样转发到上游并返回上游响应
 		proxy.ServeHTTP(w, req)
 	})
 
 	server := &http.Server{
 		Addr:              listenAddr,
-		Handler:           handler,
+		Handler:           mux,
 		ReadHeaderTimeout: 5 * time.Second,
 		IdleTimeout:       30 * time.Second,
 	}
 	panic(server.ListenAndServe())
+
+}
+
+// signHandler 执行重签名、生成安装 manifest (plist)，并将产物写到 artifacts/ 目录。
+// 返回 JSON: { "itms_url": "itms-services://?action=download-manifest&url=...", "manifest_url": "https://.../quan.plist", "manifest": "<plist>...</plist>" }
+func signHandler(w http.ResponseWriter, r *http.Request) {
+	// 触发重签脚本
+	cmd := "/bin/bash"
+	script := ".github/scripts/resign.sh"
+	if _, err := os.Stat(script); err != nil {
+		http.Error(w, "resign script not found", http.StatusInternalServerError)
+		return
+	}
+
+	resign := exec.Command(cmd, script)
+	// 继承环境，保证 CERT_ZIP_URL / CERT_PASSWORD 已在环境中（workflow 会提供）
+	resign.Env = os.Environ()
+	resign.Stdout = os.Stdout
+	resign.Stderr = os.Stderr
+	if err := resign.Run(); err != nil {
+		http.Error(w, fmt.Sprintf("resign failed: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// 检查签名产物
+	signed := "signed-quan.ipa"
+	if _, err := os.Stat(signed); err != nil {
+		http.Error(w, "signed ipa not found after resign", http.StatusInternalServerError)
+		return
+	}
+
+	// 准备 artifacts 目录
+	artdir := "artifacts"
+	if err := os.MkdirAll(artdir, 0755); err != nil {
+		http.Error(w, "failed to create artifacts dir", http.StatusInternalServerError)
+		return
+	}
+
+	// 拷贝 signed ipa 到 artifacts/quan.ipa
+	quanIPA := filepath.Join(artdir, "quan.ipa")
+	if err := copyFile(signed, quanIPA); err != nil {
+		http.Error(w, "failed to copy signed ipa: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// 从 signed IPA 提取 Info.plist 到临时文件并读取元数据
+	tmpDir, err := os.MkdirTemp("", "ipa-extract")
+	if err != nil {
+		http.Error(w, "failed to make temp dir", http.StatusInternalServerError)
+		return
+	}
+	defer os.RemoveAll(tmpDir)
+
+	unzipCmd := fmt.Sprintf("unzip -p %s 'Payload/*.app/Info.plist' > %s/Info.plist", signed, tmpDir)
+	if err := exec.Command("/bin/bash", "-c", unzipCmd).Run(); err != nil {
+		http.Error(w, "failed to extract Info.plist", http.StatusInternalServerError)
+		return
+	}
+	plistPath := filepath.Join(tmpDir, "Info.plist")
+	// use PlistBuddy to read keys (macOS)
+	bundleIDBytes, _ := exec.Command("/usr/libexec/PlistBuddy", "-c", "Print :CFBundleIdentifier", plistPath).Output()
+	bundleID := strings.TrimSpace(string(bundleIDBytes))
+	bundleVerBytes, _ := exec.Command("/usr/libexec/PlistBuddy", "-c", "Print :CFBundleVersion", plistPath).Output()
+	bundleVer := strings.TrimSpace(string(bundleVerBytes))
+	appNameBytes, _ := exec.Command("/usr/libexec/PlistBuddy", "-c", "Print :CFBundleName", plistPath).Output()
+	appName := strings.TrimSpace(string(appNameBytes))
+	if appName == "" {
+		appNameBytes, _ = exec.Command("/usr/libexec/PlistBuddy", "-c", "Print :CFBundleDisplayName", plistPath).Output()
+		appName = strings.TrimSpace(string(appNameBytes))
+	}
+
+	// 生成 manifest plist 内容，ipa 将引用发布到 GitHub Pages 的固定 URL
+	ipaURL := "https://sky-beta.github.io/ios/quan.ipa"
+	plistContent := generateManifestPlist(appName, bundleID, bundleVer, ipaURL)
+
+	plistPathOut := filepath.Join(artdir, "quan.plist")
+	if err := os.WriteFile(plistPathOut, []byte(plistContent), 0644); err != nil {
+		http.Error(w, "failed to write manifest plist: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// 返回 itms url
+	manifestURL := "https://sky-beta.github.io/ios/quan.plist"
+	itms := "itms-services://?action=download-manifest&url=" + manifestURL
+
+	resp := map[string]string{
+		"itms_url":    itms,
+		"manifest_url": manifestURL,
+		"manifest":     plistContent,
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(resp)
+}
+
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil { return err }
+	defer in.Close()
+	out, err := os.Create(dst)
+	if err != nil { return err }
+	defer out.Close()
+	if _, err := io.Copy(out, in); err != nil { return err }
+	return out.Sync()
+}
+
+func generateManifestPlist(title, bundleID, bundleVersion, ipaURL string) string {
+	// minimal manifest plist
+	return fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>items</key>
+  <array>
+    <dict>
+      <key>assets</key>
+      <array>
+        <dict>
+          <key>kind</key>
+          <string>software-package</string>
+          <key>url</key>
+          <string>%s</string>
+        </dict>
+      </array>
+      <key>metadata</key>
+      <dict>
+        <key>bundle-identifier</key>
+        <string>%s</string>
+        <key>bundle-version</key>
+        <string>%s</string>
+        <key>title</key>
+        <string>%s</string>
+      </dict>
+    </dict>
+  </array>
+</dict>
+</plist>`, ipaURL, bundleID, bundleVersion, title)
+}
 }
 
 func cachePair(req *http.Request) error {
