@@ -1,35 +1,92 @@
-name: Auto Sign IPA
+name: Sign IPA
 
 on:
+  workflow_dispatch:
   push:
+    branches: [sky-beta-cache-request-headers]
     paths:
-      - 'quan.ipa'
-  workflow_dispatch: {}
+      - quan.ipa
+      - .github/workflows/auto-sign.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sign-ipa
+  cancel-in-progress: true
 
 jobs:
   sign:
-    runs-on: macos-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - name: Ensure quan.ipa exists
+      - name: Build zsign
         run: |
-          if [ ! -f "quan.ipa" ]; then
-            echo "quan.ipa not found in repository root"; exit 1
-          fi
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends g++ make pkg-config libssl-dev
+          git clone --filter=blob:none https://github.com/zhlynn/zsign.git "$RUNNER_TEMP/zsign"
+          git -C "$RUNNER_TEMP/zsign" checkout --detach e803f870dc686e6161d00d9b22c425b8acdfacee
+          make -C "$RUNNER_TEMP/zsign/build/linux" -j"$(nproc)"
 
-      - name: Make resign script executable
-        run: chmod +x .github/scripts/resign.sh
-
-      - name: Run resign script
+      - name: Download certificate from R2 and sign
         env:
           CERT_ZIP_URL: ${{ secrets.CERT_ZIP_URL }}
           CERT_PASSWORD: ${{ secrets.CERT_PASSWORD }}
-        run: .github/scripts/resign.sh
+        run: |
+          set -euo pipefail
+          test -s quan.ipa
+          test -n "$CERT_ZIP_URL"
+          test -n "$CERT_PASSWORD"
+          mkdir -p "$RUNNER_TEMP/cert" dist
+          curl --fail --location --silent --show-error \
+            "$CERT_ZIP_URL" -o "$RUNNER_TEMP/cert.zip"
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+
+          source = Path("${{ runner.temp }}/cert.zip")
+          target = Path("${{ runner.temp }}/cert")
+          wanted = {".p12": "signing.p12", ".mobileprovision": "signing.mobileprovision"}
+          with ZipFile(source) as archive:
+              for item in archive.infolist():
+                  suffix = Path(item.filename).suffix.lower()
+                  if suffix in wanted and not (target / wanted[suffix]).exists():
+                      (target / wanted[suffix]).write_bytes(archive.read(item))
+          for filename in wanted.values():
+              path = target / filename
+              if not path.is_file() or path.stat().st_size == 0:
+                  raise SystemExit(f"Missing {filename} in certificate zip")
+          PY
+          "$RUNNER_TEMP/zsign/bin/zsign" \
+            -f \
+            -k "$RUNNER_TEMP/cert/signing.p12" \
+            -p "$CERT_PASSWORD" \
+            -m "$RUNNER_TEMP/cert/signing.mobileprovision" \
+            -z 6 \
+            -o dist/quan.ipa \
+            quan.ipa
+          test -s dist/quan.ipa
 
       - name: Upload signed IPA
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
-          name: signed-quan.ipa
-          path: signed-quan.ipa
+          name: signed-ipa
+          path: dist/quan.ipa
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish fixed download URL
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release view signed-latest >/dev/null 2>&1 || \
+            gh release create signed-latest \
+              --target "$GITHUB_SHA" \
+              --title "Latest signed IPA" \
+              --notes "Automatically signed by GitHub Actions."
+          gh release upload signed-latest dist/quan.ipa --clobber
