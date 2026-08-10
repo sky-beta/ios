@@ -18,7 +18,7 @@ jobs:
     env:
       SOURCE_IPA_URL: https://pub-6f7ffe944e2948a19530df1f8bd6fc9f.r2.dev/sky/Sky_Beta.ipa
       UPLOAD_API: https://app.idkwhn.ccwu.cc/api/sky-upload
-      SIGNED_IPA_URL: https://pub-6f7ffe944e2948a19530df1f8bd6fc9f.r2.dev/sky/Sky_Beta-signed.ipa
+      R2_PUBLIC_BASE: https://pub-6f7ffe944e2948a19530df1f8bd6fc9f.r2.dev
 
     steps:
       - name: Checkout main for ios.plist
@@ -32,6 +32,8 @@ jobs:
         run: |
           set -euo pipefail
           sudo rm -rf /usr/local/lib/android /opt/ghc /usr/share/dotnet
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends pngcrush
           df -h /
 
       - name: Restore zsign cache
@@ -45,7 +47,6 @@ jobs:
         if: steps.zsign-cache.outputs.cache-hit != 'true'
         run: |
           set -euo pipefail
-          sudo apt-get update
           sudo apt-get install -y --no-install-recommends g++ make pkg-config libssl-dev
           git clone --filter=blob:none https://github.com/zhlynn/zsign.git "$RUNNER_TEMP/zsign-src"
           git -C "$RUNNER_TEMP/zsign-src" checkout --detach e803f870dc686e6161d00d9b22c425b8acdfacee
@@ -94,7 +95,9 @@ jobs:
           python3 - <<'PY'
           import json
           import plistlib
+          import re
           from pathlib import Path
+          from urllib.parse import quote
           from zipfile import ZipFile
 
           root = Path("${{ runner.temp }}")
@@ -107,18 +110,57 @@ jobs:
               ]
               if not candidates:
                   raise SystemExit("The IPA has no Payload/*.app/Info.plist")
-              info = plistlib.loads(archive.read(candidates[0]))
+              info_path = candidates[0]
+              app_root = info_path.rsplit("/", 1)[0] + "/"
+              info = plistlib.loads(archive.read(info_path))
+
+              icon_names = []
+              primary_icon = info.get("CFBundleIcons", {}).get("CFBundlePrimaryIcon", {})
+              icon_names.extend(primary_icon.get("CFBundleIconFiles", []))
+              icon_names.extend(info.get("CFBundleIconFiles", []))
+              icon_candidates = [
+                  name for name in archive.namelist()
+                  if name.startswith(app_root)
+                  and "/" not in name[len(app_root):]
+                  and name.lower().endswith(".png")
+                  and (
+                      any(Path(name).stem.startswith(icon) for icon in icon_names)
+                      or "icon" in Path(name).name.lower()
+                  )
+              ]
+              if not icon_candidates:
+                  raise SystemExit("The IPA has no extractable app icon PNG")
+
+              def icon_score(name):
+                  lower = Path(name).name.lower()
+                  return (
+                      (300 if "@3x" in lower else 200 if "@2x" in lower else 0)
+                      + (100 if "60x60" in lower else 0)
+                      + min(archive.getinfo(name).file_size, 99999) / 100000
+                  )
+
+              icon_path = max(icon_candidates, key=icon_score)
+              (root / "sky-icon-cgbi.png").write_bytes(archive.read(icon_path))
           bundle_id = str(info.get("CFBundleIdentifier", ""))
           bundle_version = str(info.get("CFBundleVersion", ""))
           access_key = str(info.get("SkyBuildAccessKey", ""))
           title = str(info.get("CFBundleDisplayName") or info.get("CFBundleName") or "Sky Beta")
+          if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.-]{0,199}", bundle_id):
+              raise SystemExit("The IPA bundle identifier is unsafe for an R2 object name")
+          public_base = "${{ env.R2_PUBLIC_BASE }}"
+          encoded_name = quote(bundle_id, safe=".-")
+          ipa_url = f"{public_base}/sky/{encoded_name}.ipa"
+          plist_url = f"{public_base}/sky/{encoded_name}.plist"
+          icon_url = f"{public_base}/sky/{encoded_name}.png"
           metadata = {
               "bundle_id": bundle_id,
               "bundle_version": bundle_version,
               "display_version": str(info.get("CFBundleShortVersionString", "")),
               "sky_build_access_key": access_key,
               "title": title,
-              "ipa_url": "${{ env.SIGNED_IPA_URL }}",
+              "ipa_url": ipa_url,
+              "plist_url": plist_url,
+              "icon_url": icon_url,
           }
           missing = [name for name, value in {
               "CFBundleIdentifier": bundle_id,
@@ -134,9 +176,9 @@ jobs:
           manifest = {
               "items": [{
                   "assets": [
-                      {"kind": "software-package", "url": "${{ env.SIGNED_IPA_URL }}"},
-                      {"kind": "display-image", "url": "https://sky-beta.github.io/ios/logo.jpg"},
-                      {"kind": "full-size-image", "url": "https://sky-beta.github.io/ios/logo.jpg"},
+                      {"kind": "software-package", "url": ipa_url},
+                      {"kind": "display-image", "url": icon_url},
+                      {"kind": "full-size-image", "url": icon_url},
                   ],
                   "metadata": {
                       "bundle-identifier": bundle_id,
@@ -150,6 +192,9 @@ jobs:
           with (Path("${{ github.workspace }}") / "ios.plist").open("wb") as output:
               plistlib.dump(manifest, output, fmt=plistlib.FMT_XML, sort_keys=False)
           PY
+          pngcrush -q -revert-iphone-optimizations \
+            "$RUNNER_TEMP/sky-icon-cgbi.png" "$RUNNER_TEMP/sky-icon.png"
+          test -s "$RUNNER_TEMP/sky-icon.png"
           "$HOME/.cache/sky-zsign/zsign" \
             -f \
             -k "$RUNNER_TEMP/cert/signing.p12" \
@@ -169,16 +214,20 @@ jobs:
           set -euo pipefail
           test -n "$SKY_UPLOAD_TOKEN"
           AUTH_HEADER="Authorization: Bearer $SKY_UPLOAD_TOKEN"
+          BUNDLE_ID="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["bundle_id"])' "$RUNNER_TEMP/sky-metadata.json")"
+          OBJECT_NAME="$BUNDLE_ID.ipa"
+          ENCODED_OBJECT_NAME="$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$OBJECT_NAME")"
           CREATE_RESPONSE="$(curl --fail --silent --show-error --retry 5 --retry-all-errors \
-            -X POST -H "$AUTH_HEADER" "$UPLOAD_API/create")"
+            -X POST -H "$AUTH_HEADER" "$UPLOAD_API/create?name=$ENCODED_OBJECT_NAME")"
           UPLOAD_ID="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["upload_id"])' <<<"$CREATE_RESPONSE")"
           test -n "$UPLOAD_ID"
           export UPLOAD_ID
-          printf '%s' "$UPLOAD_ID" > "$RUNNER_TEMP/sky-upload-id"
+          export OBJECT_NAME
+          printf '%s\n%s\n' "$UPLOAD_ID" "$OBJECT_NAME" > "$RUNNER_TEMP/sky-upload-id"
           abort_upload() {
             curl --silent --show-error --retry 3 --retry-all-errors \
               -X POST -H "$AUTH_HEADER" \
-              "$UPLOAD_API/abort?upload_id=$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$UPLOAD_ID")" \
+              "$UPLOAD_API/abort?name=$ENCODED_OBJECT_NAME&upload_id=$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$UPLOAD_ID")" \
               >/dev/null || true
           }
           trap abort_upload ERR INT TERM
@@ -194,7 +243,7 @@ jobs:
             curl --fail --silent --show-error --retry 5 --retry-all-errors \
               -X PUT -H "$AUTH_HEADER" -H "Content-Type: application/octet-stream" \
               --data-binary @"$RUNNER_TEMP/sky-part.bin" \
-              "$UPLOAD_API/part?upload_id=$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$UPLOAD_ID")&part_number=$PART_NUMBER" \
+              "$UPLOAD_API/part?name=$ENCODED_OBJECT_NAME&upload_id=$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$UPLOAD_ID")&part_number=$PART_NUMBER" \
               >> "$RUNNER_TEMP/sky-parts.jsonl"
             printf '\n' >> "$RUNNER_TEMP/sky-parts.jsonl"
           done
@@ -206,7 +255,11 @@ jobs:
           from pathlib import Path
           root = Path("${{ runner.temp }}")
           parts = [json.loads(line) for line in (root / "sky-parts.jsonl").read_text().splitlines() if line]
-          payload = {"upload_id": os.environ["UPLOAD_ID"], "parts": parts}
+          payload = {
+              "upload_id": os.environ["UPLOAD_ID"],
+              "name": os.environ["OBJECT_NAME"],
+              "parts": parts,
+          }
           (root / "sky-complete.json").write_text(json.dumps(payload), encoding="utf-8")
           PY
           curl --fail --silent --show-error --retry 5 --retry-all-errors \
@@ -214,6 +267,16 @@ jobs:
             --data-binary @"$RUNNER_TEMP/sky-complete.json" "$UPLOAD_API/complete"
           rm -f "$RUNNER_TEMP/sky-upload-id"
           trap - ERR INT TERM
+          PLIST_NAME="$BUNDLE_ID.plist"
+          ICON_NAME="$BUNDLE_ID.png"
+          curl --fail --silent --show-error --retry 5 --retry-all-errors \
+            -X PUT -H "$AUTH_HEADER" -H "Content-Type: application/xml" \
+            --data-binary @"$GITHUB_WORKSPACE/ios.plist" \
+            "$UPLOAD_API/object?name=$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$PLIST_NAME")"
+          curl --fail --silent --show-error --retry 5 --retry-all-errors \
+            -X PUT -H "$AUTH_HEADER" -H "Content-Type: image/png" \
+            --data-binary @"$RUNNER_TEMP/sky-icon.png" \
+            "$UPLOAD_API/object?name=$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$ICON_NAME")"
           curl --fail --silent --show-error --retry 5 --retry-all-errors \
             -X PUT -H "$AUTH_HEADER" -H "Content-Type: application/json" \
             --data-binary @"$RUNNER_TEMP/sky-metadata.json" "$UPLOAD_API/metadata"
@@ -228,21 +291,33 @@ jobs:
           if [[ ! -s "$ID_FILE" ]]; then
             exit 0
           fi
-          UPLOAD_ID="$(cat "$ID_FILE")"
+          UPLOAD_ID="$(sed -n '1p' "$ID_FILE")"
+          OBJECT_NAME="$(sed -n '2p' "$ID_FILE")"
           curl --silent --show-error --retry 3 --retry-all-errors \
             -X POST -H "Authorization: Bearer $SKY_UPLOAD_TOKEN" \
-            "$UPLOAD_API/abort?upload_id=$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$UPLOAD_ID")" \
+            "$UPLOAD_API/abort?name=$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$OBJECT_NAME")&upload_id=$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$UPLOAD_ID")" \
             >/dev/null || true
           rm -f "$ID_FILE"
 
       - name: Verify public signed IPA
         run: |
           set -euo pipefail
+          SIGNED_IPA_URL="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["ipa_url"])' "$RUNNER_TEMP/sky-metadata.json")"
+          PLIST_URL="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["plist_url"])' "$RUNNER_TEMP/sky-metadata.json")"
+          ICON_URL="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["icon_url"])' "$RUNNER_TEMP/sky-metadata.json")"
           EXPECTED_SIZE="$(stat -c %s "$RUNNER_TEMP/Sky_Beta-signed.ipa")"
           ACTUAL_SIZE="$(curl --fail --silent --show-error --retry 5 --retry-all-errors \
             --head "$SIGNED_IPA_URL" | tr -d '\r' | awk 'tolower($1) == "content-length:" {print $2}' | tail -1)"
           test "$ACTUAL_SIZE" = "$EXPECTED_SIZE"
+          curl --fail --silent --show-error --retry 5 --retry-all-errors \
+            "$PLIST_URL" -o "$RUNNER_TEMP/r2-install.plist"
+          curl --fail --silent --show-error --retry 5 --retry-all-errors \
+            "$ICON_URL" -o "$RUNNER_TEMP/r2-icon.png"
+          cmp "$GITHUB_WORKSPACE/ios.plist" "$RUNNER_TEMP/r2-install.plist"
+          cmp "$RUNNER_TEMP/sky-icon.png" "$RUNNER_TEMP/r2-icon.png"
           echo "Published $ACTUAL_SIZE bytes to $SIGNED_IPA_URL"
+          echo "Published install manifest to $PLIST_URL"
+          echo "Published app icon to $ICON_URL"
 
       - name: Replace ios.plist on main
         run: |
