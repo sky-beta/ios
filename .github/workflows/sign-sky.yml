@@ -1,0 +1,259 @@
+name: Sign Sky Beta IPA
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sign-sky-beta-ipa
+  cancel-in-progress: false
+
+jobs:
+  sign:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+
+    env:
+      SOURCE_IPA_URL: https://pub-6f7ffe944e2948a19530df1f8bd6fc9f.r2.dev/sky/Sky_Beta.ipa
+      UPLOAD_API: https://app.idkwhn.ccwu.cc/api/sky-upload
+      SIGNED_IPA_URL: https://pub-6f7ffe944e2948a19530df1f8bd6fc9f.r2.dev/sky/Sky_Beta-signed.ipa
+
+    steps:
+      - name: Checkout main for ios.plist
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          sparse-checkout: ios.plist
+          sparse-checkout-cone-mode: false
+
+      - name: Free disk space for the large IPA
+        run: |
+          set -euo pipefail
+          sudo rm -rf /usr/local/lib/android /opt/ghc /usr/share/dotnet
+          df -h /
+
+      - name: Restore zsign cache
+        id: zsign-cache
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/sky-zsign/zsign
+          key: sky-zsign-${{ runner.os }}-e803f870dc686e6161d00d9b22c425b8acdfacee
+
+      - name: Build zsign
+        if: steps.zsign-cache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends g++ make pkg-config libssl-dev
+          git clone --filter=blob:none https://github.com/zhlynn/zsign.git "$RUNNER_TEMP/zsign-src"
+          git -C "$RUNNER_TEMP/zsign-src" checkout --detach e803f870dc686e6161d00d9b22c425b8acdfacee
+          make -C "$RUNNER_TEMP/zsign-src/build/linux" -j"$(nproc)"
+          mkdir -p "$HOME/.cache/sky-zsign"
+          install -m 0755 "$RUNNER_TEMP/zsign-src/bin/zsign" "$HOME/.cache/sky-zsign/zsign"
+
+      - name: Download IPA and certificate
+        env:
+          CERT_ZIP_URL: ${{ secrets.CERT_ZIP_URL }}
+          CERT_PASSWORD: ${{ secrets.CERT_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$CERT_ZIP_URL"
+          test -n "$CERT_PASSWORD"
+          curl --fail --location --retry 5 --retry-all-errors --continue-at - \
+            "$SOURCE_IPA_URL" -o "$RUNNER_TEMP/Sky_Beta.ipa"
+          curl --fail --location --retry 5 --retry-all-errors \
+            "$CERT_ZIP_URL" -o "$RUNNER_TEMP/cert.zip"
+          test -s "$RUNNER_TEMP/Sky_Beta.ipa"
+          mkdir -p "$RUNNER_TEMP/cert"
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+
+          root = Path("${{ runner.temp }}")
+          wanted = {".p12": "signing.p12", ".mobileprovision": "signing.mobileprovision"}
+          with ZipFile(root / "cert.zip") as archive:
+              for item in archive.infolist():
+                  suffix = Path(item.filename).suffix.lower()
+                  target = root / "cert" / wanted.get(suffix, "")
+                  if suffix in wanted and not target.exists():
+                      target.write_bytes(archive.read(item))
+          for filename in wanted.values():
+              path = root / "cert" / filename
+              if not path.is_file() or path.stat().st_size == 0:
+                  raise SystemExit(f"Missing {filename} in certificate zip")
+          PY
+          df -h /
+
+      - name: Read app metadata and sign
+        env:
+          CERT_PASSWORD: ${{ secrets.CERT_PASSWORD }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import plistlib
+          from pathlib import Path
+          from zipfile import ZipFile
+
+          root = Path("${{ runner.temp }}")
+          with ZipFile(root / "Sky_Beta.ipa") as archive:
+              candidates = [
+                  name for name in archive.namelist()
+                  if name.startswith("Payload/")
+                  and name.count("/") == 2
+                  and name.endswith(".app/Info.plist")
+              ]
+              if not candidates:
+                  raise SystemExit("The IPA has no Payload/*.app/Info.plist")
+              info = plistlib.loads(archive.read(candidates[0]))
+          bundle_id = str(info.get("CFBundleIdentifier", ""))
+          bundle_version = str(info.get("CFBundleVersion", ""))
+          access_key = str(info.get("SkyBuildAccessKey", ""))
+          title = str(info.get("CFBundleDisplayName") or info.get("CFBundleName") or "Sky Beta")
+          metadata = {
+              "bundle_id": bundle_id,
+              "bundle_version": bundle_version,
+              "display_version": str(info.get("CFBundleShortVersionString", "")),
+              "sky_build_access_key": access_key,
+              "title": title,
+              "ipa_url": "${{ env.SIGNED_IPA_URL }}",
+          }
+          missing = [name for name, value in {
+              "CFBundleIdentifier": bundle_id,
+              "CFBundleVersion": bundle_version,
+              "SkyBuildAccessKey": access_key,
+          }.items() if not value]
+          if missing:
+              raise SystemExit("Missing required Info.plist value(s): " + ", ".join(missing))
+          (root / "sky-metadata.json").write_text(
+              json.dumps(metadata, ensure_ascii=False), encoding="utf-8"
+          )
+
+          manifest = {
+              "items": [{
+                  "assets": [
+                      {"kind": "software-package", "url": "${{ env.SIGNED_IPA_URL }}"},
+                      {"kind": "display-image", "url": "https://sky-beta.github.io/ios/logo.jpg"},
+                      {"kind": "full-size-image", "url": "https://sky-beta.github.io/ios/logo.jpg"},
+                  ],
+                  "metadata": {
+                      "bundle-identifier": bundle_id,
+                      "bundle-version": bundle_version,
+                      "SkyBuildAccessKey": access_key,
+                      "kind": "software",
+                      "title": title,
+                  },
+              }],
+          }
+          with (Path("${{ github.workspace }}") / "ios.plist").open("wb") as output:
+              plistlib.dump(manifest, output, fmt=plistlib.FMT_XML, sort_keys=False)
+          PY
+          "$HOME/.cache/sky-zsign/zsign" \
+            -f \
+            -k "$RUNNER_TEMP/cert/signing.p12" \
+            -p "$CERT_PASSWORD" \
+            -m "$RUNNER_TEMP/cert/signing.mobileprovision" \
+            -z 1 \
+            -o "$RUNNER_TEMP/Sky_Beta-signed.ipa" \
+            "$RUNNER_TEMP/Sky_Beta.ipa"
+          test -s "$RUNNER_TEMP/Sky_Beta-signed.ipa"
+          rm -f "$RUNNER_TEMP/Sky_Beta.ipa" "$RUNNER_TEMP/cert.zip"
+          df -h /
+
+      - name: Multipart upload signed IPA to R2
+        env:
+          SKY_UPLOAD_TOKEN: ${{ secrets.SKY_UPLOAD_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$SKY_UPLOAD_TOKEN"
+          AUTH_HEADER="Authorization: Bearer $SKY_UPLOAD_TOKEN"
+          CREATE_RESPONSE="$(curl --fail --silent --show-error --retry 5 --retry-all-errors \
+            -X POST -H "$AUTH_HEADER" "$UPLOAD_API/create")"
+          UPLOAD_ID="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["upload_id"])' <<<"$CREATE_RESPONSE")"
+          test -n "$UPLOAD_ID"
+          export UPLOAD_ID
+          printf '%s' "$UPLOAD_ID" > "$RUNNER_TEMP/sky-upload-id"
+          abort_upload() {
+            curl --silent --show-error --retry 3 --retry-all-errors \
+              -X POST -H "$AUTH_HEADER" \
+              "$UPLOAD_API/abort?upload_id=$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$UPLOAD_ID")" \
+              >/dev/null || true
+          }
+          trap abort_upload ERR INT TERM
+
+          : > "$RUNNER_TEMP/sky-parts.jsonl"
+          PART_SIZE=$((64 * 1024 * 1024))
+          FILE_SIZE="$(stat -c %s "$RUNNER_TEMP/Sky_Beta-signed.ipa")"
+          PART_COUNT=$(((FILE_SIZE + PART_SIZE - 1) / PART_SIZE))
+          for PART_NUMBER in $(seq 1 "$PART_COUNT"); do
+            dd if="$RUNNER_TEMP/Sky_Beta-signed.ipa" \
+              of="$RUNNER_TEMP/sky-part.bin" \
+              bs="$PART_SIZE" skip=$((PART_NUMBER - 1)) count=1 status=none
+            curl --fail --silent --show-error --retry 5 --retry-all-errors \
+              -X PUT -H "$AUTH_HEADER" -H "Content-Type: application/octet-stream" \
+              --data-binary @"$RUNNER_TEMP/sky-part.bin" \
+              "$UPLOAD_API/part?upload_id=$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$UPLOAD_ID")&part_number=$PART_NUMBER" \
+              >> "$RUNNER_TEMP/sky-parts.jsonl"
+            printf '\n' >> "$RUNNER_TEMP/sky-parts.jsonl"
+          done
+          rm -f "$RUNNER_TEMP/sky-part.bin"
+
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          root = Path("${{ runner.temp }}")
+          parts = [json.loads(line) for line in (root / "sky-parts.jsonl").read_text().splitlines() if line]
+          payload = {"upload_id": os.environ["UPLOAD_ID"], "parts": parts}
+          (root / "sky-complete.json").write_text(json.dumps(payload), encoding="utf-8")
+          PY
+          curl --fail --silent --show-error --retry 5 --retry-all-errors \
+            -X POST -H "$AUTH_HEADER" -H "Content-Type: application/json" \
+            --data-binary @"$RUNNER_TEMP/sky-complete.json" "$UPLOAD_API/complete"
+          rm -f "$RUNNER_TEMP/sky-upload-id"
+          trap - ERR INT TERM
+          curl --fail --silent --show-error --retry 5 --retry-all-errors \
+            -X PUT -H "$AUTH_HEADER" -H "Content-Type: application/json" \
+            --data-binary @"$RUNNER_TEMP/sky-metadata.json" "$UPLOAD_API/metadata"
+
+      - name: Cleanup unfinished multipart upload
+        if: ${{ always() }}
+        env:
+          SKY_UPLOAD_TOKEN: ${{ secrets.SKY_UPLOAD_TOKEN }}
+        run: |
+          set -euo pipefail
+          ID_FILE="$RUNNER_TEMP/sky-upload-id"
+          if [[ ! -s "$ID_FILE" ]]; then
+            exit 0
+          fi
+          UPLOAD_ID="$(cat "$ID_FILE")"
+          curl --silent --show-error --retry 3 --retry-all-errors \
+            -X POST -H "Authorization: Bearer $SKY_UPLOAD_TOKEN" \
+            "$UPLOAD_API/abort?upload_id=$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$UPLOAD_ID")" \
+            >/dev/null || true
+          rm -f "$ID_FILE"
+
+      - name: Verify public signed IPA
+        run: |
+          set -euo pipefail
+          EXPECTED_SIZE="$(stat -c %s "$RUNNER_TEMP/Sky_Beta-signed.ipa")"
+          ACTUAL_SIZE="$(curl --fail --silent --show-error --retry 5 --retry-all-errors \
+            --head "$SIGNED_IPA_URL" | tr -d '\r' | awk 'tolower($1) == "content-length:" {print $2}' | tail -1)"
+          test "$ACTUAL_SIZE" = "$EXPECTED_SIZE"
+          echo "Published $ACTUAL_SIZE bytes to $SIGNED_IPA_URL"
+
+      - name: Replace ios.plist on main
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- ios.plist
+          if git diff --cached --quiet; then
+            echo "ios.plist is already current"
+            exit 0
+          fi
+          git commit -m "Update Sky Beta installation manifest"
+          git pull --rebase origin main
+          git push origin HEAD:main
