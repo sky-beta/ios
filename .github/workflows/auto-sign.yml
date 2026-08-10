@@ -23,7 +23,15 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Restore zsign cache
+        id: zsign-cache
+        uses: actions/cache@v5
+        with:
+          path: .tools/zsign
+          key: zsign-${{ runner.os }}-e803f870dc686e6161d00d9b22c425b8acdfacee
+
       - name: Build zsign
+        if: steps.zsign-cache.outputs.cache-hit != 'true'
         run: |
           set -euo pipefail
           sudo apt-get update
@@ -31,6 +39,13 @@ jobs:
           git clone --filter=blob:none https://github.com/zhlynn/zsign.git "$RUNNER_TEMP/zsign"
           git -C "$RUNNER_TEMP/zsign" checkout --detach e803f870dc686e6161d00d9b22c425b8acdfacee
           make -C "$RUNNER_TEMP/zsign/build/linux" -j"$(nproc)"
+          mkdir -p .tools
+          install -m 0755 "$RUNNER_TEMP/zsign/bin/zsign" .tools/zsign
+
+      - name: Verify zsign
+        run: |
+          test -x .tools/zsign
+          .tools/zsign --version
 
       - name: Download certificate from R2 and sign
         env:
@@ -61,7 +76,7 @@ jobs:
               if not path.is_file() or path.stat().st_size == 0:
                   raise SystemExit(f"Missing {filename} in certificate zip")
           PY
-          "$RUNNER_TEMP/zsign/bin/zsign" \
+          .tools/zsign \
             -f \
             -k "$RUNNER_TEMP/cert/signing.p12" \
             -p "$CERT_PASSWORD" \
