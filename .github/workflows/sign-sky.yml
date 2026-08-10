@@ -32,8 +32,6 @@ jobs:
         run: |
           set -euo pipefail
           sudo rm -rf /usr/local/lib/android /opt/ghc /usr/share/dotnet
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends pngcrush
           df -h /
 
       - name: Restore zsign cache
@@ -47,6 +45,7 @@ jobs:
         if: steps.zsign-cache.outputs.cache-hit != 'true'
         run: |
           set -euo pipefail
+          sudo apt-get update
           sudo apt-get install -y --no-install-recommends g++ make pkg-config libssl-dev
           git clone --filter=blob:none https://github.com/zhlynn/zsign.git "$RUNNER_TEMP/zsign-src"
           git -C "$RUNNER_TEMP/zsign-src" checkout --detach e803f870dc686e6161d00d9b22c425b8acdfacee
@@ -96,11 +95,99 @@ jobs:
           import json
           import plistlib
           import re
+          import struct
+          import zlib
           from pathlib import Path
           from urllib.parse import quote
           from zipfile import ZipFile
 
           root = Path("${{ runner.temp }}")
+
+          def png_chunk(chunk_type, payload):
+              body = chunk_type + payload
+              return struct.pack(">I", len(payload)) + body + struct.pack(">I", zlib.crc32(body))
+
+          def paeth(left, up, upper_left):
+              estimate = left + up - upper_left
+              left_distance = abs(estimate - left)
+              up_distance = abs(estimate - up)
+              upper_left_distance = abs(estimate - upper_left)
+              if left_distance <= up_distance and left_distance <= upper_left_distance:
+                  return left
+              if up_distance <= upper_left_distance:
+                  return up
+              return upper_left
+
+          def convert_cgbi_png(source):
+              signature = b"\x89PNG\r\n\x1a\n"
+              if not source.startswith(signature):
+                  raise SystemExit("The extracted app icon is not a PNG")
+              chunks = []
+              position = len(signature)
+              while position + 12 <= len(source):
+                  length = struct.unpack(">I", source[position:position + 4])[0]
+                  chunk_type = source[position + 4:position + 8]
+                  payload = source[position + 8:position + 8 + length]
+                  chunks.append((chunk_type, payload))
+                  position += 12 + length
+                  if chunk_type == b"IEND":
+                      break
+              if not any(chunk_type == b"CgBI" for chunk_type, _ in chunks):
+                  return source
+              ihdr = next(payload for chunk_type, payload in chunks if chunk_type == b"IHDR")
+              width, height, bit_depth, color_type, compression, filtering, interlace = struct.unpack(
+                  ">IIBBBBB", ihdr
+              )
+              if (bit_depth, color_type, compression, filtering, interlace) != (8, 6, 0, 0, 0):
+                  raise SystemExit("Unsupported CgBI app icon format")
+              compressed = b"".join(payload for chunk_type, payload in chunks if chunk_type == b"IDAT")
+              filtered = zlib.decompress(compressed, -15)
+              stride = width * 4
+              if len(filtered) != height * (stride + 1):
+                  raise SystemExit("Invalid CgBI app icon scanline data")
+              previous = bytearray(stride)
+              output = bytearray()
+              offset = 0
+              for _ in range(height):
+                  filter_type = filtered[offset]
+                  source_row = filtered[offset + 1:offset + 1 + stride]
+                  offset += stride + 1
+                  row = bytearray(stride)
+                  for index, value in enumerate(source_row):
+                      left = row[index - 4] if index >= 4 else 0
+                      up = previous[index]
+                      upper_left = previous[index - 4] if index >= 4 else 0
+                      if filter_type == 0:
+                          restored = value
+                      elif filter_type == 1:
+                          restored = value + left
+                      elif filter_type == 2:
+                          restored = value + up
+                      elif filter_type == 3:
+                          restored = value + ((left + up) // 2)
+                      elif filter_type == 4:
+                          restored = value + paeth(left, up, upper_left)
+                      else:
+                          raise SystemExit("Unsupported PNG filter in CgBI app icon")
+                      row[index] = restored & 255
+                  output.append(0)
+                  for index in range(0, stride, 4):
+                      blue, green, red, alpha = row[index:index + 4]
+                      if alpha:
+                          red = min(255, (red * 255 + alpha // 2) // alpha)
+                          green = min(255, (green * 255 + alpha // 2) // alpha)
+                          blue = min(255, (blue * 255 + alpha // 2) // alpha)
+                      else:
+                          red = green = blue = 0
+                      output.extend((red, green, blue, alpha))
+                  previous = row
+              return (
+                  signature
+                  + png_chunk(b"IHDR", ihdr)
+                  + png_chunk(b"IDAT", zlib.compress(bytes(output), 9))
+                  + png_chunk(b"IEND", b"")
+              )
+
           with ZipFile(root / "Sky_Beta.ipa") as archive:
               candidates = [
                   name for name in archive.namelist()
@@ -140,7 +227,7 @@ jobs:
                   )
 
               icon_path = max(icon_candidates, key=icon_score)
-              (root / "sky-icon-cgbi.png").write_bytes(archive.read(icon_path))
+              (root / "sky-icon.png").write_bytes(convert_cgbi_png(archive.read(icon_path)))
           bundle_id = str(info.get("CFBundleIdentifier", ""))
           bundle_version = str(info.get("CFBundleVersion", ""))
           access_key = str(info.get("SkyBuildAccessKey", ""))
@@ -192,8 +279,6 @@ jobs:
           with (Path("${{ github.workspace }}") / "ios.plist").open("wb") as output:
               plistlib.dump(manifest, output, fmt=plistlib.FMT_XML, sort_keys=False)
           PY
-          pngcrush -q -revert-iphone-optimizations \
-            "$RUNNER_TEMP/sky-icon-cgbi.png" "$RUNNER_TEMP/sky-icon.png"
           test -s "$RUNNER_TEMP/sky-icon.png"
           "$HOME/.cache/sky-zsign/zsign" \
             -f \
