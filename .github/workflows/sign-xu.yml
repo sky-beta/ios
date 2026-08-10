@@ -1,0 +1,367 @@
+name: Patch Inject and Sign Sky Xu IPA
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: sign-sky-xu-ipa
+  cancel-in-progress: false
+
+jobs:
+  sign:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+
+    env:
+      SOURCE_IPA_URL: https://pub-6f7ffe944e2948a19530df1f8bd6fc9f.r2.dev/sky/Sky.ipa
+      PLUGIN_DYLIB_URL: https://pub-6f7ffe944e2948a19530df1f8bd6fc9f.r2.dev/sky/Sky.dylib
+      PLUGIN_DEB_URL: https://pub-6f7ffe944e2948a19530df1f8bd6fc9f.r2.dev/sky/Sky.deb
+      UPLOAD_API: https://app.idkwhn.ccwu.cc/api/sky-upload
+      R2_PUBLIC_BASE: https://pub-6f7ffe944e2948a19530df1f8bd6fc9f.r2.dev
+      R2_SCOPE: xu
+
+    steps:
+      - name: Free disk space for the large IPA
+        run: |
+          set -euo pipefail
+          sudo rm -rf /usr/local/lib/android /opt/ghc /usr/share/dotnet
+          df -h /
+
+      - name: Restore zsign cache
+        id: zsign-cache
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/sky-zsign/zsign
+          key: sky-zsign-${{ runner.os }}-e803f870dc686e6161d00d9b22c425b8acdfacee
+
+      - name: Build zsign
+        if: steps.zsign-cache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends g++ make pkg-config libssl-dev
+          git clone --filter=blob:none https://github.com/zhlynn/zsign.git "$RUNNER_TEMP/zsign-src"
+          git -C "$RUNNER_TEMP/zsign-src" checkout --detach e803f870dc686e6161d00d9b22c425b8acdfacee
+          make -C "$RUNNER_TEMP/zsign-src/build/linux" -j"$(nproc)"
+          mkdir -p "$HOME/.cache/sky-zsign"
+          install -m 0755 "$RUNNER_TEMP/zsign-src/bin/zsign" "$HOME/.cache/sky-zsign/zsign"
+
+      - name: Download IPA certificate and optional plugin
+        env:
+          CERT_ZIP_URL: ${{ secrets.CERT_ZIP_URL }}
+          CERT_PASSWORD: ${{ secrets.CERT_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$CERT_ZIP_URL"
+          test -n "$CERT_PASSWORD"
+          curl --fail --location --retry 5 --retry-all-errors --continue-at - \
+            "$SOURCE_IPA_URL" -o "$RUNNER_TEMP/Sky.ipa"
+          curl --fail --location --retry 5 --retry-all-errors \
+            "$CERT_ZIP_URL" -o "$RUNNER_TEMP/cert.zip"
+          test -s "$RUNNER_TEMP/Sky.ipa"
+
+          PLUGIN_PATH=""
+          if curl --fail --location --silent --show-error --retry 3 --retry-all-errors \
+            "$PLUGIN_DYLIB_URL" -o "$RUNNER_TEMP/Sky.dylib"; then
+            if file "$RUNNER_TEMP/Sky.dylib" | grep -q 'Mach-O'; then
+              PLUGIN_PATH="$RUNNER_TEMP/Sky.dylib"
+              echo "Using direct Sky.dylib plugin"
+            else
+              rm -f "$RUNNER_TEMP/Sky.dylib"
+            fi
+          fi
+
+          if [[ -z "$PLUGIN_PATH" ]] && curl --fail --location --silent --show-error \
+            --retry 3 --retry-all-errors "$PLUGIN_DEB_URL" -o "$RUNNER_TEMP/Sky.deb"; then
+            mkdir -p "$RUNNER_TEMP/deb"
+            dpkg-deb -x "$RUNNER_TEMP/Sky.deb" "$RUNNER_TEMP/deb"
+            PLUGIN_PATH="$(find "$RUNNER_TEMP/deb" -type f -iname '*.dylib' -print -quit)"
+            if [[ -n "$PLUGIN_PATH" ]] && file "$PLUGIN_PATH" | grep -q 'Mach-O'; then
+              echo "Using dylib extracted from Sky.deb"
+            else
+              PLUGIN_PATH=""
+            fi
+          fi
+
+          if [[ -n "$PLUGIN_PATH" ]]; then
+            printf '%s' "$PLUGIN_PATH" > "$RUNNER_TEMP/plugin-path"
+          else
+            echo "No valid plugin was found; the IPA will be patched and signed without injection"
+          fi
+
+          mkdir -p "$RUNNER_TEMP/cert"
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+
+          root = Path("${{ runner.temp }}")
+          wanted = {".p12": "signing.p12", ".mobileprovision": "signing.mobileprovision"}
+          with ZipFile(root / "cert.zip") as archive:
+              for item in archive.infolist():
+                  suffix = Path(item.filename).suffix.lower()
+                  target = root / "cert" / wanted.get(suffix, "")
+                  if suffix in wanted and not target.exists():
+                      target.write_bytes(archive.read(item))
+          for filename in wanted.values():
+              path = root / "cert" / filename
+              if not path.is_file() or path.stat().st_size == 0:
+                  raise SystemExit(f"Missing {filename} in certificate zip")
+          PY
+          df -h /
+
+      - name: Locate and patch the main executable
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/unpacked"
+          unzip -q "$RUNNER_TEMP/Sky.ipa" -d "$RUNNER_TEMP/unpacked"
+          python3 - <<'PY'
+          import json
+          import plistlib
+          import re
+          from pathlib import Path
+          from urllib.parse import quote
+
+          root = Path("${{ runner.temp }}")
+          payload = root / "unpacked" / "Payload"
+          apps = sorted(path for path in payload.glob("*.app") if path.is_dir())
+          if not apps:
+              raise SystemExit("The IPA has no Payload/*.app bundle")
+          app = apps[0]
+          info_path = app / "Info.plist"
+          info = plistlib.loads(info_path.read_bytes())
+          executable_name = str(info.get("CFBundleExecutable", ""))
+          if not executable_name or "/" in executable_name or "\\" in executable_name:
+              raise SystemExit("The IPA has an invalid CFBundleExecutable")
+          executable = app / executable_name
+          if not executable.is_file():
+              raise SystemExit(f"Main executable not found: {executable}")
+
+          old_float = bytes.fromhex("000020400000803F")
+          new_float = bytes.fromhex("000080400000803F")
+          old_oauth = bytes.fromhex(
+              "68747470733A2F2F25732F6163636F756E742F617574682F6F617574685F7265"
+              "646972656374004D6F7A696C6C612F352E3020286950686F6E653B2043505520"
+              "6950686F6E65"
+          )
+          new_oauth = bytes.fromhex(
+              "68747470733A2F2F6C6976652E72616469616E63652E7468617467616D65636F"
+              "6D70616E792E636F6D2F6163636F756E742F617574682F6F617574685F726564"
+              "697265637400"
+          )
+          if len(old_float) != len(new_float) or len(old_oauth) != len(new_oauth):
+              raise SystemExit("A binary replacement changes the executable length")
+          binary = executable.read_bytes()
+          float_count = binary.count(old_float)
+          oauth_count = binary.count(old_oauth)
+          if float_count < 1 or oauth_count < 1:
+              raise SystemExit(
+                  f"Required patch bytes are missing: float={float_count}, oauth={oauth_count}"
+              )
+          binary = binary.replace(old_float, new_float).replace(old_oauth, new_oauth)
+          executable.write_bytes(binary)
+          if binary.count(old_float) or binary.count(old_oauth):
+              raise SystemExit("The main executable still contains unpatched target bytes")
+          print(
+              f"Patched {executable.name}: float={float_count}, oauth={oauth_count}, "
+              f"bytes={len(binary)}"
+          )
+
+          bundle_id = str(info.get("CFBundleIdentifier", ""))
+          bundle_version = str(info.get("CFBundleVersion", ""))
+          access_key = str(info.get("SkyBuildAccessKey", ""))
+          title = str(info.get("CFBundleDisplayName") or info.get("CFBundleName") or "Sky Xu")
+          if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.-]{0,199}", bundle_id):
+              raise SystemExit("The IPA bundle identifier is unsafe for an R2 object name")
+          missing = [name for name, value in {
+              "CFBundleIdentifier": bundle_id,
+              "CFBundleVersion": bundle_version,
+              "SkyBuildAccessKey": access_key,
+          }.items() if not value]
+          if missing:
+              raise SystemExit("Missing required Info.plist value(s): " + ", ".join(missing))
+
+          public_base = "${{ env.R2_PUBLIC_BASE }}"
+          encoded_name = quote(bundle_id, safe=".-")
+          object_base = f"{public_base}/sky/${{ env.R2_SCOPE }}/{encoded_name}"
+          metadata = {
+              "bundle_id": bundle_id,
+              "bundle_version": bundle_version,
+              "display_version": str(info.get("CFBundleShortVersionString", "")),
+              "sky_build_access_key": access_key,
+              "title": title,
+              "ipa_url": object_base + ".ipa",
+              "plist_url": object_base + ".plist",
+              "icon_url": object_base + ".png",
+              "main_executable": executable_name,
+              "patch_counts": {"float": float_count, "oauth": oauth_count},
+          }
+          (root / "xu-metadata.json").write_text(
+              json.dumps(metadata, ensure_ascii=False), encoding="utf-8"
+          )
+          (root / "app-dir").write_text(str(app), encoding="utf-8")
+
+          manifest = {
+              "items": [{
+                  "assets": [
+                      {"kind": "software-package", "url": metadata["ipa_url"]},
+                      {"kind": "display-image", "url": metadata["icon_url"]},
+                      {"kind": "full-size-image", "url": metadata["icon_url"]},
+                  ],
+                  "metadata": {
+                      "bundle-identifier": bundle_id,
+                      "bundle-version": bundle_version,
+                      "SkyBuildAccessKey": access_key,
+                      "kind": "software",
+                      "title": title,
+                  },
+              }],
+          }
+          with (root / "xu.plist").open("wb") as output:
+              plistlib.dump(manifest, output, fmt=plistlib.FMT_XML, sort_keys=False)
+          PY
+
+      - name: Inject optional plugin and sign
+        env:
+          CERT_PASSWORD: ${{ secrets.CERT_PASSWORD }}
+        run: |
+          set -euo pipefail
+          APP_DIR="$(cat "$RUNNER_TEMP/app-dir")"
+          INJECT_ARGS=()
+          if [[ -s "$RUNNER_TEMP/plugin-path" ]]; then
+            PLUGIN_PATH="$(cat "$RUNNER_TEMP/plugin-path")"
+            INJECT_ARGS=(-l "$PLUGIN_PATH")
+          fi
+          rm -rf "$RUNNER_TEMP/zsign-metadata"
+          "$HOME/.cache/sky-zsign/zsign" \
+            -f \
+            -k "$RUNNER_TEMP/cert/signing.p12" \
+            -p "$CERT_PASSWORD" \
+            -m "$RUNNER_TEMP/cert/signing.mobileprovision" \
+            -x "$RUNNER_TEMP/zsign-metadata" \
+            "${INJECT_ARGS[@]}" \
+            -z 1 \
+            -o "$RUNNER_TEMP/Sky-xu-signed.ipa" \
+            "$APP_DIR"
+          test -s "$RUNNER_TEMP/Sky-xu-signed.ipa"
+          ICON_PATH="$(find "$RUNNER_TEMP/zsign-metadata" -type f -iname '*.png' -print -quit)"
+          test -n "$ICON_PATH"
+          install -m 0644 "$ICON_PATH" "$RUNNER_TEMP/xu-icon.png"
+          test -s "$RUNNER_TEMP/xu-icon.png"
+          rm -rf "$RUNNER_TEMP/unpacked" "$RUNNER_TEMP/zsign-metadata" "$RUNNER_TEMP/deb"
+          rm -f "$RUNNER_TEMP/Sky.ipa" "$RUNNER_TEMP/cert.zip" "$RUNNER_TEMP/Sky.deb"
+          df -h /
+
+      - name: Multipart upload Xu IPA and install assets to R2
+        env:
+          SKY_UPLOAD_TOKEN: ${{ secrets.SKY_UPLOAD_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$SKY_UPLOAD_TOKEN"
+          AUTH_HEADER="Authorization: Bearer $SKY_UPLOAD_TOKEN"
+          BUNDLE_ID="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["bundle_id"])' "$RUNNER_TEMP/xu-metadata.json")"
+          OBJECT_NAME="$BUNDLE_ID.ipa"
+          ENCODED_OBJECT_NAME="$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$OBJECT_NAME")"
+          CREATE_RESPONSE="$(curl --fail --silent --show-error --retry 5 --retry-all-errors \
+            -X POST -H "$AUTH_HEADER" \
+            "$UPLOAD_API/create?scope=$R2_SCOPE&name=$ENCODED_OBJECT_NAME")"
+          UPLOAD_ID="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["upload_id"])' <<<"$CREATE_RESPONSE")"
+          test -n "$UPLOAD_ID"
+          export UPLOAD_ID OBJECT_NAME R2_SCOPE
+          printf '%s\n%s\n' "$UPLOAD_ID" "$OBJECT_NAME" > "$RUNNER_TEMP/xu-upload-id"
+          abort_upload() {
+            curl --silent --show-error --retry 3 --retry-all-errors \
+              -X POST -H "$AUTH_HEADER" \
+              "$UPLOAD_API/abort?scope=$R2_SCOPE&name=$ENCODED_OBJECT_NAME&upload_id=$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$UPLOAD_ID")" \
+              >/dev/null || true
+          }
+          trap abort_upload ERR INT TERM
+
+          : > "$RUNNER_TEMP/xu-parts.jsonl"
+          PART_SIZE=$((64 * 1024 * 1024))
+          FILE_SIZE="$(stat -c %s "$RUNNER_TEMP/Sky-xu-signed.ipa")"
+          PART_COUNT=$(((FILE_SIZE + PART_SIZE - 1) / PART_SIZE))
+          for PART_NUMBER in $(seq 1 "$PART_COUNT"); do
+            dd if="$RUNNER_TEMP/Sky-xu-signed.ipa" \
+              of="$RUNNER_TEMP/xu-part.bin" \
+              bs="$PART_SIZE" skip=$((PART_NUMBER - 1)) count=1 status=none
+            curl --fail --silent --show-error --retry 5 --retry-all-errors \
+              -X PUT -H "$AUTH_HEADER" -H "Content-Type: application/octet-stream" \
+              --data-binary @"$RUNNER_TEMP/xu-part.bin" \
+              "$UPLOAD_API/part?scope=$R2_SCOPE&name=$ENCODED_OBJECT_NAME&upload_id=$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$UPLOAD_ID")&part_number=$PART_NUMBER" \
+              >> "$RUNNER_TEMP/xu-parts.jsonl"
+            printf '\n' >> "$RUNNER_TEMP/xu-parts.jsonl"
+          done
+          rm -f "$RUNNER_TEMP/xu-part.bin"
+
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          root = Path("${{ runner.temp }}")
+          parts = [json.loads(line) for line in (root / "xu-parts.jsonl").read_text().splitlines() if line]
+          payload = {
+              "upload_id": os.environ["UPLOAD_ID"],
+              "name": os.environ["OBJECT_NAME"],
+              "scope": os.environ["R2_SCOPE"],
+              "parts": parts,
+          }
+          (root / "xu-complete.json").write_text(json.dumps(payload), encoding="utf-8")
+          PY
+          curl --fail --silent --show-error --retry 5 --retry-all-errors \
+            -X POST -H "$AUTH_HEADER" -H "Content-Type: application/json" \
+            --data-binary @"$RUNNER_TEMP/xu-complete.json" "$UPLOAD_API/complete"
+          rm -f "$RUNNER_TEMP/xu-upload-id"
+          trap - ERR INT TERM
+
+          PLIST_NAME="$BUNDLE_ID.plist"
+          ICON_NAME="$BUNDLE_ID.png"
+          curl --fail --silent --show-error --retry 5 --retry-all-errors \
+            -X PUT -H "$AUTH_HEADER" -H "Content-Type: application/xml" \
+            --data-binary @"$RUNNER_TEMP/xu.plist" \
+            "$UPLOAD_API/object?scope=$R2_SCOPE&name=$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$PLIST_NAME")"
+          curl --fail --silent --show-error --retry 5 --retry-all-errors \
+            -X PUT -H "$AUTH_HEADER" -H "Content-Type: image/png" \
+            --data-binary @"$RUNNER_TEMP/xu-icon.png" \
+            "$UPLOAD_API/object?scope=$R2_SCOPE&name=$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$ICON_NAME")"
+          curl --fail --silent --show-error --retry 5 --retry-all-errors \
+            -X PUT -H "$AUTH_HEADER" -H "Content-Type: application/json" \
+            --data-binary @"$RUNNER_TEMP/xu-metadata.json" \
+            "$UPLOAD_API/metadata?scope=$R2_SCOPE"
+
+      - name: Cleanup unfinished Xu multipart upload
+        if: ${{ always() }}
+        env:
+          SKY_UPLOAD_TOKEN: ${{ secrets.SKY_UPLOAD_TOKEN }}
+        run: |
+          set -euo pipefail
+          ID_FILE="$RUNNER_TEMP/xu-upload-id"
+          if [[ ! -s "$ID_FILE" ]]; then
+            exit 0
+          fi
+          UPLOAD_ID="$(sed -n '1p' "$ID_FILE")"
+          OBJECT_NAME="$(sed -n '2p' "$ID_FILE")"
+          curl --silent --show-error --retry 3 --retry-all-errors \
+            -X POST -H "Authorization: Bearer $SKY_UPLOAD_TOKEN" \
+            "$UPLOAD_API/abort?scope=$R2_SCOPE&name=$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$OBJECT_NAME")&upload_id=$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$UPLOAD_ID")" \
+            >/dev/null || true
+          rm -f "$ID_FILE"
+
+      - name: Verify public Xu IPA plist and icon
+        run: |
+          set -euo pipefail
+          IPA_URL="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["ipa_url"])' "$RUNNER_TEMP/xu-metadata.json")"
+          PLIST_URL="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["plist_url"])' "$RUNNER_TEMP/xu-metadata.json")"
+          ICON_URL="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["icon_url"])' "$RUNNER_TEMP/xu-metadata.json")"
+          EXPECTED_SIZE="$(stat -c %s "$RUNNER_TEMP/Sky-xu-signed.ipa")"
+          ACTUAL_SIZE="$(curl --fail --silent --show-error --retry 5 --retry-all-errors \
+            --head "$IPA_URL" | tr -d '\r' | awk 'tolower($1) == "content-length:" {print $2}' | tail -1)"
+          test "$ACTUAL_SIZE" = "$EXPECTED_SIZE"
+          curl --fail --silent --show-error --retry 5 --retry-all-errors \
+            "$PLIST_URL" -o "$RUNNER_TEMP/r2-xu.plist"
+          curl --fail --silent --show-error --retry 5 --retry-all-errors \
+            "$ICON_URL" -o "$RUNNER_TEMP/r2-xu-icon.png"
+          cmp "$RUNNER_TEMP/xu.plist" "$RUNNER_TEMP/r2-xu.plist"
+          cmp "$RUNNER_TEMP/xu-icon.png" "$RUNNER_TEMP/r2-xu-icon.png"
+          echo "Published $ACTUAL_SIZE bytes to $IPA_URL"
+          echo "Published Xu install manifest to $PLIST_URL"
+          echo "Published Xu app icon to $ICON_URL"
