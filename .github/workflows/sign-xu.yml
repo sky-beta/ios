@@ -1,7 +1,10 @@
-name: Patch Inject and Sign Sky Xu IPA
+name: Inject Sky DEB and Sign IPA
 
 on:
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 concurrency:
   group: sign-sky-xu-ipa
@@ -14,13 +17,21 @@ jobs:
 
     env:
       SOURCE_IPA_URL: https://pub-6f7ffe944e2948a19530df1f8bd6fc9f.r2.dev/sky/Sky.ipa
-      PLUGIN_DYLIB_URL: https://pub-6f7ffe944e2948a19530df1f8bd6fc9f.r2.dev/sky/Sky.dylib
       PLUGIN_DEB_URL: https://pub-6f7ffe944e2948a19530df1f8bd6fc9f.r2.dev/sky/Sky.deb
       UPLOAD_API: https://app.idkwhn.ccwu.cc/api/sky-upload
       R2_PUBLIC_BASE: https://pub-6f7ffe944e2948a19530df1f8bd6fc9f.r2.dev
-      R2_SCOPE: xu
+      R2_SCOPE: Sky
 
     steps:
+      - name: Checkout main for sky.plist
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          sparse-checkout: |
+            sky.plist
+            sky.png
+          sparse-checkout-cone-mode: false
+
       - name: Free disk space for the large IPA
         run: |
           set -euo pipefail
@@ -61,17 +72,7 @@ jobs:
           test -s "$RUNNER_TEMP/Sky.ipa"
 
           PLUGIN_PATH=""
-          if curl --fail --location --silent --show-error --retry 3 --retry-all-errors \
-            "$PLUGIN_DYLIB_URL" -o "$RUNNER_TEMP/Sky.dylib"; then
-            if file "$RUNNER_TEMP/Sky.dylib" | grep -q 'Mach-O'; then
-              PLUGIN_PATH="$RUNNER_TEMP/Sky.dylib"
-              echo "Using direct Sky.dylib plugin"
-            else
-              rm -f "$RUNNER_TEMP/Sky.dylib"
-            fi
-          fi
-
-          if [[ -z "$PLUGIN_PATH" ]] && curl --fail --location --silent --show-error \
+          if curl --fail --location --silent --show-error \
             --retry 3 --retry-all-errors "$PLUGIN_DEB_URL" -o "$RUNNER_TEMP/Sky.deb"; then
             mkdir -p "$RUNNER_TEMP/deb"
             dpkg-deb -x "$RUNNER_TEMP/Sky.deb" "$RUNNER_TEMP/deb"
@@ -86,7 +87,7 @@ jobs:
           if [[ -n "$PLUGIN_PATH" ]]; then
             printf '%s' "$PLUGIN_PATH" > "$RUNNER_TEMP/plugin-path"
           else
-            echo "No valid plugin was found; the IPA will be patched and signed without injection"
+            echo "Sky.deb is unavailable or has no valid dylib; signing without injection"
           fi
 
           mkdir -p "$RUNNER_TEMP/cert"
@@ -109,7 +110,7 @@ jobs:
           PY
           df -h /
 
-      - name: Locate and patch the main executable
+      - name: Locate the main executable and build sky.plist
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/unpacked"
@@ -135,41 +136,12 @@ jobs:
           executable = app / executable_name
           if not executable.is_file():
               raise SystemExit(f"Main executable not found: {executable}")
-
-          old_float = bytes.fromhex("000020400000803F")
-          new_float = bytes.fromhex("000080400000803F")
-          old_oauth = bytes.fromhex(
-              "68747470733A2F2F25732F6163636F756E742F617574682F6F617574685F7265"
-              "646972656374004D6F7A696C6C612F352E3020286950686F6E653B2043505520"
-              "6950686F6E65"
-          )
-          new_oauth = bytes.fromhex(
-              "68747470733A2F2F6C6976652E72616469616E63652E7468617467616D65636F"
-              "6D70616E792E636F6D2F6163636F756E742F617574682F6F617574685F726564"
-              "697265637400"
-          )
-          if len(old_float) != len(new_float) or len(old_oauth) != len(new_oauth):
-              raise SystemExit("A binary replacement changes the executable length")
-          binary = executable.read_bytes()
-          float_count = binary.count(old_float)
-          oauth_count = binary.count(old_oauth)
-          if float_count < 1 or oauth_count < 1:
-              raise SystemExit(
-                  f"Required patch bytes are missing: float={float_count}, oauth={oauth_count}"
-              )
-          binary = binary.replace(old_float, new_float).replace(old_oauth, new_oauth)
-          executable.write_bytes(binary)
-          if binary.count(old_float) or binary.count(old_oauth):
-              raise SystemExit("The main executable still contains unpatched target bytes")
-          print(
-              f"Patched {executable.name}: float={float_count}, oauth={oauth_count}, "
-              f"bytes={len(binary)}"
-          )
+          print(f"Located main executable without modifying it: {executable}")
 
           bundle_id = str(info.get("CFBundleIdentifier", ""))
           bundle_version = str(info.get("CFBundleVersion", ""))
           access_key = str(info.get("SkyBuildAccessKey", ""))
-          title = str(info.get("CFBundleDisplayName") or info.get("CFBundleName") or "Sky Xu")
+          title = str(info.get("CFBundleDisplayName") or info.get("CFBundleName") or "Sky")
           if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.-]{0,199}", bundle_id):
               raise SystemExit("The IPA bundle identifier is unsafe for an R2 object name")
           missing = [name for name, value in {
@@ -193,7 +165,6 @@ jobs:
               "plist_url": object_base + ".plist",
               "icon_url": object_base + ".png",
               "main_executable": executable_name,
-              "patch_counts": {"float": float_count, "oauth": oauth_count},
           }
           (root / "xu-metadata.json").write_text(
               json.dumps(metadata, ensure_ascii=False), encoding="utf-8"
@@ -216,7 +187,7 @@ jobs:
                   },
               }],
           }
-          with (root / "xu.plist").open("wb") as output:
+          with (Path("${{ github.workspace }}") / "sky.plist").open("wb") as output:
               plistlib.dump(manifest, output, fmt=plistlib.FMT_XML, sort_keys=False)
           PY
 
@@ -245,8 +216,8 @@ jobs:
           test -s "$RUNNER_TEMP/Sky-xu-signed.ipa"
           ICON_PATH="$(find "$RUNNER_TEMP/zsign-metadata" -type f -iname '*.png' -print -quit)"
           test -n "$ICON_PATH"
-          install -m 0644 "$ICON_PATH" "$RUNNER_TEMP/xu-icon.png"
-          test -s "$RUNNER_TEMP/xu-icon.png"
+          install -m 0644 "$ICON_PATH" "$GITHUB_WORKSPACE/sky.png"
+          test -s "$GITHUB_WORKSPACE/sky.png"
           rm -rf "$RUNNER_TEMP/unpacked" "$RUNNER_TEMP/zsign-metadata" "$RUNNER_TEMP/deb"
           rm -f "$RUNNER_TEMP/Sky.ipa" "$RUNNER_TEMP/cert.zip" "$RUNNER_TEMP/Sky.deb"
           df -h /
@@ -317,11 +288,11 @@ jobs:
           ICON_NAME="$BUNDLE_ID.png"
           curl --fail --silent --show-error --retry 5 --retry-all-errors \
             -X PUT -H "$AUTH_HEADER" -H "Content-Type: application/xml" \
-            --data-binary @"$RUNNER_TEMP/xu.plist" \
+            --data-binary @"$GITHUB_WORKSPACE/sky.plist" \
             "$UPLOAD_API/object?scope=$R2_SCOPE&name=$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$PLIST_NAME")"
           curl --fail --silent --show-error --retry 5 --retry-all-errors \
             -X PUT -H "$AUTH_HEADER" -H "Content-Type: image/png" \
-            --data-binary @"$RUNNER_TEMP/xu-icon.png" \
+            --data-binary @"$GITHUB_WORKSPACE/sky.png" \
             "$UPLOAD_API/object?scope=$R2_SCOPE&name=$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$ICON_NAME")"
           curl --fail --silent --show-error --retry 5 --retry-all-errors \
             -X PUT -H "$AUTH_HEADER" -H "Content-Type: application/json" \
@@ -360,8 +331,22 @@ jobs:
             "$PLIST_URL" -o "$RUNNER_TEMP/r2-xu.plist"
           curl --fail --silent --show-error --retry 5 --retry-all-errors \
             "$ICON_URL" -o "$RUNNER_TEMP/r2-xu-icon.png"
-          cmp "$RUNNER_TEMP/xu.plist" "$RUNNER_TEMP/r2-xu.plist"
-          cmp "$RUNNER_TEMP/xu-icon.png" "$RUNNER_TEMP/r2-xu-icon.png"
+          cmp "$GITHUB_WORKSPACE/sky.plist" "$RUNNER_TEMP/r2-xu.plist"
+          cmp "$GITHUB_WORKSPACE/sky.png" "$RUNNER_TEMP/r2-xu-icon.png"
           echo "Published $ACTUAL_SIZE bytes to $IPA_URL"
           echo "Published Xu install manifest to $PLIST_URL"
           echo "Published Xu app icon to $ICON_URL"
+
+      - name: Create or update sky.plist and sky.png on main
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- sky.plist sky.png
+          if git diff --cached --quiet; then
+            echo "sky.plist and sky.png are already current"
+            exit 0
+          fi
+          git commit -m "Update Sky installation manifest and icon"
+          git pull --rebase origin main
+          git push origin HEAD:main
