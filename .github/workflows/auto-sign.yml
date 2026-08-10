@@ -86,22 +86,15 @@ jobs:
             quan.ipa
           test -s dist/quan.ipa
 
-      - name: Upload signed IPA
-        uses: actions/upload-artifact@v7
-        with:
-          name: signed-ipa
-          path: dist/quan.ipa
-          if-no-files-found: error
-          retention-days: 30
-
       - name: Publish fixed download URL
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh release view signed-latest >/dev/null 2>&1 || \
+          gh release upload signed-latest dist/quan.ipa --clobber || {
             gh release create signed-latest \
               --target "$GITHUB_SHA" \
               --title "Latest signed IPA" \
               --notes "Automatically signed by GitHub Actions."
-          gh release upload signed-latest dist/quan.ipa --clobber
+            gh release upload signed-latest dist/quan.ipa --clobber
+          }
