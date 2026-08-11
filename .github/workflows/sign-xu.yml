@@ -1,6 +1,6 @@
 name: Inject Sky Plugin and Sign IPA
 
-run-name: Sky ${{ inputs.plugin_source || 'deb' }} ${{ inputs.request_id || github.run_id }}
+run-name: ${{ inputs.plugin_source == 'none' && 'iOS' || 'Sky' }} ${{ inputs.plugin_source || 'deb' }} ${{ inputs.request_id || github.run_id }}
 
 on:
   workflow_dispatch:
@@ -17,6 +17,7 @@ on:
         options:
           - deb
           - dylib
+          - none
 
 permissions:
   contents: write
@@ -31,13 +32,13 @@ jobs:
     timeout-minutes: 60
 
     env:
-      SOURCE_IPA_URL: https://pub-6f7ffe944e2948a19530df1f8bd6fc9f.r2.dev/sky/Sky.ipa
+      SOURCE_IPA_URL: ${{ inputs.plugin_source == 'none' && 'https://pub-6f7ffe944e2948a19530df1f8bd6fc9f.r2.dev/sky/ios.ipa' || 'https://pub-6f7ffe944e2948a19530df1f8bd6fc9f.r2.dev/sky/Sky.ipa' }}
       PLUGIN_DEB_URL: https://pub-6f7ffe944e2948a19530df1f8bd6fc9f.r2.dev/sky/Sky.deb
       PLUGIN_DYLIB_URL: https://pub-6f7ffe944e2948a19530df1f8bd6fc9f.r2.dev/sky/Sky.dylib
       UPLOAD_API: https://app.idkwhn.ccwu.cc/api/sky-upload
       R2_PUBLIC_BASE: https://pub-6f7ffe944e2948a19530df1f8bd6fc9f.r2.dev
-      R2_SCOPE: ${{ inputs.plugin_source == 'dylib' && 'Xu' || 'Sky' }}
-      GITHUB_ASSET_PREFIX: ${{ inputs.plugin_source == 'dylib' && 'xu' || 'sky' }}
+      R2_SCOPE: ${{ inputs.plugin_source == 'none' && 'ios' || (inputs.plugin_source == 'dylib' && 'Xu' || 'Sky') }}
+      GITHUB_ASSET_PREFIX: ${{ inputs.plugin_source == 'none' && 'ios-app' || (inputs.plugin_source == 'dylib' && 'xu' || 'sky') }}
 
     steps:
       - name: Checkout main installation assets
@@ -49,6 +50,8 @@ jobs:
             sky.png
             xu.plist
             xu.png
+            ios-app.plist
+            ios-app.png
           sparse-checkout-cone-mode: false
 
       - name: Free disk space for the large IPA
@@ -116,6 +119,8 @@ jobs:
                 PLUGIN_PATH=""
               fi
             fi
+          elif [[ "$PLUGIN_SOURCE" == "none" ]]; then
+            echo "Signing ios.ipa without injection or binary modification"
           else
             echo "Unsupported plugin source: $PLUGIN_SOURCE" >&2
             exit 1
@@ -123,6 +128,8 @@ jobs:
 
           if [[ -n "$PLUGIN_PATH" ]]; then
             printf '%s' "$PLUGIN_PATH" > "$RUNNER_TEMP/plugin-path"
+          elif [[ "$PLUGIN_SOURCE" == "none" ]]; then
+            echo "No plugin requested"
           else
             echo "Requested plugin is unavailable or invalid; signing without injection"
           fi
