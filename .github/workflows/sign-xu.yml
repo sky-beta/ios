@@ -208,7 +208,68 @@ jobs:
           executable = app / executable_name
           if not executable.is_file():
               raise SystemExit(f"Main executable not found: {executable}")
-          print(f"Located main executable without modifying it: {executable}")
+
+          if "${{ inputs.plugin_source || 'deb' }}" == "dylib":
+              def exact_hex(value):
+                  compact = re.sub(r"\\s+", "", value)
+                  if not compact or len(compact) % 2 or not re.fullmatch(r"[0-9A-Fa-f]+", compact):
+                      raise SystemExit("Invalid hexadecimal replacement value")
+                  return bytes.fromhex(compact)
+
+              old = exact_hex("""
+                  68 74 74 70 73 3A 2F 2F
+                  25 73 2F 61 63 63 6F 75
+                  6E 74 2F 61 75 74 68 2F
+                  6F 61 75 74 68 5F 72 65
+                  64 69 72 65 63 74 00 4D
+                  6F 7A 69 6C 6C 61 2F 35
+                  2E 30 20 28 69 50 68 6F
+                  6E 65 3B 20 43 50 55 20
+                  69 50 68 6F 6E 65
+              """)
+              new = exact_hex("""
+                  68 74 74 70 73 3A 2F 2F
+                  6C 69 76 65 2E 72 61 64
+                  69 61 6E 63 65 2E 74 68
+                  61 74 67 61 6D 65 63 6F
+                  6D 70 61 6E 79 2E 63 6F
+                  6D 2F 61 63 63 6F 75 6E
+                  74 2F 61 75 74 68 2F 6F
+                  61 75 74 68 5F 72 65 64
+                  69 72 65 63 74 00
+              """)
+              if len(old) != 70 or len(new) != 70 or len(old) != len(new):
+                  raise SystemExit("Hex replacement must be exactly 70 bytes on both sides")
+
+              original = executable.read_bytes()
+              offsets = []
+              position = 0
+              while True:
+                  position = original.find(old, position)
+                  if position < 0:
+                      break
+                  offsets.append(position)
+                  position += 1
+              if len(offsets) != 1:
+                  raise SystemExit(f"Expected one exact 70-byte pattern, found {len(offsets)}")
+
+              offset = offsets[0]
+              patched = original[:offset] + new + original[offset + len(old):]
+              if len(patched) != len(original):
+                  raise SystemExit("Patched executable size changed")
+              if patched[:offset] != original[:offset] or patched[offset + len(new):] != original[offset + len(old):]:
+                  raise SystemExit("Bytes outside the exact replacement range changed")
+
+              executable.write_bytes(patched)
+              verified = executable.read_bytes()
+              if (len(verified) != len(original) or
+                      verified[offset:offset + len(new)] != new or
+                      verified[:offset] != original[:offset] or
+                      verified[offset + len(new):] != original[offset + len(old):]):
+                  raise SystemExit("Written executable failed exact replacement verification")
+              print(f"Replaced one exact 70-byte pattern at file offset 0x{offset:X}; executable size unchanged")
+          else:
+              print(f"Located main executable without hex modification: {executable}")
 
           bundle_id = str(info.get("CFBundleIdentifier", ""))
           bundle_version = str(info.get("CFBundleVersion", ""))
