@@ -1,10 +1,18 @@
 name: Inject Sky Plugin and Sign IPA
 
-run-name: ${{ inputs.plugin_source == 'none' && 'iOS' || 'Sky' }} ${{ inputs.plugin_source || 'deb' }} ${{ inputs.request_id || github.run_id }}
+run-name: ${{ inputs.operation == 'cleanup' && 'Clean R2 multipart' || (inputs.plugin_source == 'none' && 'iOS' || 'Sky') }} ${{ inputs.operation == 'cleanup' && inputs.cleanup_name || (inputs.plugin_source || 'deb') }} ${{ inputs.request_id || github.run_id }}
 
 on:
   workflow_dispatch:
     inputs:
+      operation:
+        description: Signing or exact multipart cleanup
+        required: false
+        default: sign
+        type: choice
+        options:
+          - sign
+          - cleanup
       request_id:
         description: Unique signing request ID
         required: false
@@ -18,6 +26,24 @@ on:
           - deb
           - dylib
           - none
+      cleanup_scope:
+        description: R2 scope used by cleanup
+        required: false
+        default: Xu
+        type: choice
+        options:
+          - Beta
+          - Sky
+          - Xu
+          - ios
+      cleanup_name:
+        description: Incomplete IPA object name used by cleanup
+        required: false
+        type: string
+      cleanup_upload_id:
+        description: Multipart upload ID used by cleanup
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -28,6 +54,7 @@ concurrency:
 
 jobs:
   sign:
+    if: inputs.operation != 'cleanup'
     runs-on: ubuntu-24.04
     timeout-minutes: 60
 
@@ -395,3 +422,36 @@ jobs:
           git commit -m "Update $GITHUB_ASSET_PREFIX installation manifest and icon"
           git pull --rebase origin main
           git push origin HEAD:main
+
+  cleanup:
+    if: inputs.operation == 'cleanup'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Abort exact incomplete multipart upload
+        env:
+          SKY_UPLOAD_TOKEN: ${{ secrets.SKY_UPLOAD_TOKEN }}
+          SCOPE: ${{ inputs.cleanup_scope }}
+          OBJECT_NAME: ${{ inputs.cleanup_name }}
+          UPLOAD_ID: ${{ inputs.cleanup_upload_id }}
+        run: |
+          set -euo pipefail
+          test -n "$SKY_UPLOAD_TOKEN"
+          test -n "$OBJECT_NAME"
+          test -n "$UPLOAD_ID"
+          QUERY="$(python3 - <<'PY'
+          import os
+          from urllib.parse import urlencode
+          print(urlencode({
+              "scope": os.environ["SCOPE"],
+              "name": os.environ["OBJECT_NAME"],
+              "upload_id": os.environ["UPLOAD_ID"],
+          }))
+          PY
+          )"
+          RESPONSE="$(curl --fail-with-body --silent --show-error --request POST \
+            -H "Authorization: Bearer $SKY_UPLOAD_TOKEN" \
+            "https://app.idkwhn.ccwu.cc/api/sky-upload/abort?$QUERY")"
+          python3 -c 'import json,sys; data=json.load(sys.stdin); assert data.get("success") and data.get("aborted")' \
+            <<<"$RESPONSE"
+          echo "Incomplete multipart upload aborted."
