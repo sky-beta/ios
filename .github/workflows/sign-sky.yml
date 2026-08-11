@@ -1,7 +1,14 @@
 name: Sign Sky Beta IPA
 
+run-name: Sky Beta ${{ inputs.request_id || github.run_id }}
+
 on:
   workflow_dispatch:
+    inputs:
+      request_id:
+        description: Unique signing request ID
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -62,8 +69,10 @@ jobs:
           set -euo pipefail
           test -n "$CERT_ZIP_URL"
           test -n "$CERT_PASSWORD"
+          SOURCE_REQUEST_URL="${SOURCE_IPA_URL}?signing_run=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           curl --fail --location --retry 5 --retry-all-errors --continue-at - \
-            "$SOURCE_IPA_URL" -o "$RUNNER_TEMP/Sky_Beta.ipa"
+            -H "Cache-Control: no-cache" -H "Pragma: no-cache" \
+            "$SOURCE_REQUEST_URL" -o "$RUNNER_TEMP/Sky_Beta.ipa"
           curl --fail --location --retry 5 --retry-all-errors \
             "$CERT_ZIP_URL" -o "$RUNNER_TEMP/cert.zip"
           test -s "$RUNNER_TEMP/Sky_Beta.ipa"
