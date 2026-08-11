@@ -1,0 +1,100 @@
+name: Sign IPA
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [sky-beta-cache-request-headers]
+    paths:
+      - quan.ipa
+      - .github/workflows/auto-sign.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sign-ipa
+  cancel-in-progress: true
+
+jobs:
+  sign:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Restore zsign cache
+        id: zsign-cache
+        uses: actions/cache@v5
+        with:
+          path: .tools/zsign
+          key: zsign-${{ runner.os }}-e803f870dc686e6161d00d9b22c425b8acdfacee
+
+      - name: Build zsign
+        if: steps.zsign-cache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends g++ make pkg-config libssl-dev
+          git clone --filter=blob:none https://github.com/zhlynn/zsign.git "$RUNNER_TEMP/zsign"
+          git -C "$RUNNER_TEMP/zsign" checkout --detach e803f870dc686e6161d00d9b22c425b8acdfacee
+          make -C "$RUNNER_TEMP/zsign/build/linux" -j"$(nproc)"
+          mkdir -p .tools
+          install -m 0755 "$RUNNER_TEMP/zsign/bin/zsign" .tools/zsign
+
+      - name: Verify zsign
+        run: |
+          test -x .tools/zsign
+          .tools/zsign --version
+
+      - name: Download certificate from R2 and sign
+        env:
+          CERT_ZIP_URL: ${{ secrets.CERT_ZIP_URL }}
+          CERT_PASSWORD: ${{ secrets.CERT_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -s quan.ipa
+          test -n "$CERT_ZIP_URL"
+          test -n "$CERT_PASSWORD"
+          mkdir -p "$RUNNER_TEMP/cert" dist
+          curl --fail --location --silent --show-error \
+            "$CERT_ZIP_URL" -o "$RUNNER_TEMP/cert.zip"
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+
+          source = Path("${{ runner.temp }}/cert.zip")
+          target = Path("${{ runner.temp }}/cert")
+          wanted = {".p12": "signing.p12", ".mobileprovision": "signing.mobileprovision"}
+          with ZipFile(source) as archive:
+              for item in archive.infolist():
+                  suffix = Path(item.filename).suffix.lower()
+                  if suffix in wanted and not (target / wanted[suffix]).exists():
+                      (target / wanted[suffix]).write_bytes(archive.read(item))
+          for filename in wanted.values():
+              path = target / filename
+              if not path.is_file() or path.stat().st_size == 0:
+                  raise SystemExit(f"Missing {filename} in certificate zip")
+          PY
+          .tools/zsign \
+            -f \
+            -k "$RUNNER_TEMP/cert/signing.p12" \
+            -p "$CERT_PASSWORD" \
+            -m "$RUNNER_TEMP/cert/signing.mobileprovision" \
+            -z 6 \
+            -o dist/quan.ipa \
+            quan.ipa
+          test -s dist/quan.ipa
+
+      - name: Publish fixed download URL
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release upload signed-latest dist/quan.ipa --clobber || {
+            gh release create signed-latest \
+              --target "$GITHUB_SHA" \
+              --title "Latest signed IPA" \
+              --notes "Automatically signed by GitHub Actions."
+            gh release upload signed-latest dist/quan.ipa --clobber
+          }
