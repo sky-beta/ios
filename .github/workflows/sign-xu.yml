@@ -268,6 +268,51 @@ jobs:
                       verified[offset + len(new):] != original[offset + len(old):]):
                   raise SystemExit("Written executable failed exact replacement verification")
               print(f"Replaced one exact 70-byte pattern at file offset 0x{offset:X}; executable size unchanged")
+
+              old_hostname = "live.radiance.thatgamecompany.com"
+              new_hostname = "sky.jljlb.vip"
+              plist_format = plistlib.FMT_BINARY if info_path.read_bytes().startswith(b"bplist00") else plistlib.FMT_XML
+              replacements = 0
+
+              def replace_plist_value(value):
+                  global replacements
+                  if isinstance(value, str):
+                      if value == old_hostname:
+                          replacements += 1
+                          return new_hostname
+                      return value
+                  if isinstance(value, dict):
+                      return {key: replace_plist_value(item) for key, item in value.items()}
+                  if isinstance(value, list):
+                      return [replace_plist_value(item) for item in value]
+                  return value
+
+              info = replace_plist_value(info)
+              if replacements != 1:
+                  raise SystemExit(
+                      f"Expected one exact Info.plist hostname value, found {replacements}"
+                  )
+              with info_path.open("wb") as output:
+                  plistlib.dump(info, output, fmt=plist_format, sort_keys=False)
+              verified_info = plistlib.loads(info_path.read_bytes())
+
+              def count_plist_value(value, expected):
+                  if isinstance(value, str):
+                      return int(value == expected)
+                  if isinstance(value, dict):
+                      return sum(count_plist_value(item, expected) for item in value.values())
+                  if isinstance(value, list):
+                      return sum(count_plist_value(item, expected) for item in value)
+                  return 0
+
+              if (count_plist_value(verified_info, old_hostname) != 0 or
+                      count_plist_value(verified_info, new_hostname) != 1):
+                  raise SystemExit("Info.plist hostname replacement verification failed")
+              info = verified_info
+              print(
+                  "Updated one exact Info.plist hostname value: "
+                  f"{old_hostname} -> {new_hostname}; plist format preserved"
+              )
           else:
               print(f"Located main executable without hex modification: {executable}")
 
