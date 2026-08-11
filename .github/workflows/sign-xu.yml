@@ -22,7 +22,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: sign-sky-xu-ipa
+  group: sign-sky-${{ inputs.plugin_source || 'deb' }}-ipa
   cancel-in-progress: false
 
 jobs:
