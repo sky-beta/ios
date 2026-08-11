@@ -211,7 +211,7 @@ jobs:
 
           if "${{ inputs.plugin_source || 'deb' }}" == "dylib":
               def exact_hex(value):
-                  compact = re.sub(r"\\s+", "", value)
+                  compact = re.sub(r"\s+", "", value)
                   if not compact or len(compact) % 2 or not re.fullmatch(r"[0-9A-Fa-f]+", compact):
                       raise SystemExit("Invalid hexadecimal replacement value")
                   return bytes.fromhex(compact)
