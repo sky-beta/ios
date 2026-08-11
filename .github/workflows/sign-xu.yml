@@ -32,6 +32,7 @@ on:
         default: Xu
         type: choice
         options:
+          - root
           - Beta
           - Sky
           - Xu
@@ -443,7 +444,7 @@ jobs:
           import os
           from urllib.parse import urlencode
           print(urlencode({
-              "scope": os.environ["SCOPE"],
+              "scope": "" if os.environ["SCOPE"] == "root" else os.environ["SCOPE"],
               "name": os.environ["OBJECT_NAME"],
               "upload_id": os.environ["UPLOAD_ID"],
           }))
