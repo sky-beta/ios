@@ -37,15 +37,18 @@ jobs:
       UPLOAD_API: https://app.idkwhn.ccwu.cc/api/sky-upload
       R2_PUBLIC_BASE: https://pub-6f7ffe944e2948a19530df1f8bd6fc9f.r2.dev
       R2_SCOPE: ${{ inputs.plugin_source == 'dylib' && 'Xu' || 'Sky' }}
+      GITHUB_ASSET_PREFIX: ${{ inputs.plugin_source == 'dylib' && 'xu' || 'sky' }}
 
     steps:
-      - name: Checkout main for sky.plist
+      - name: Checkout main installation assets
         uses: actions/checkout@v6
         with:
           ref: main
           sparse-checkout: |
             sky.plist
             sky.png
+            xu.plist
+            xu.png
           sparse-checkout-cone-mode: false
 
       - name: Free disk space for the large IPA
@@ -221,7 +224,8 @@ jobs:
                   },
               }],
           }
-          with (Path("${{ github.workspace }}") / "sky.plist").open("wb") as output:
+          asset_prefix = "${{ env.GITHUB_ASSET_PREFIX }}"
+          with (Path("${{ github.workspace }}") / f"{asset_prefix}.plist").open("wb") as output:
               plistlib.dump(manifest, output, fmt=plistlib.FMT_XML, sort_keys=False)
           PY
 
@@ -250,8 +254,8 @@ jobs:
           test -s "$RUNNER_TEMP/Sky-xu-signed.ipa"
           ICON_PATH="$(find "$RUNNER_TEMP/zsign-metadata" -type f -iname '*.png' -print -quit)"
           test -n "$ICON_PATH"
-          install -m 0644 "$ICON_PATH" "$GITHUB_WORKSPACE/sky.png"
-          test -s "$GITHUB_WORKSPACE/sky.png"
+          install -m 0644 "$ICON_PATH" "$GITHUB_WORKSPACE/$GITHUB_ASSET_PREFIX.png"
+          test -s "$GITHUB_WORKSPACE/$GITHUB_ASSET_PREFIX.png"
           rm -rf "$RUNNER_TEMP/unpacked" "$RUNNER_TEMP/zsign-metadata" "$RUNNER_TEMP/deb"
           rm -f "$RUNNER_TEMP/Sky.ipa" "$RUNNER_TEMP/cert.zip" "$RUNNER_TEMP/Sky.deb" "$RUNNER_TEMP/Sky.dylib"
           df -h /
@@ -322,11 +326,11 @@ jobs:
           ICON_NAME="$BUNDLE_ID.png"
           curl --fail --silent --show-error --retry 5 --retry-all-errors \
             -X PUT -H "$AUTH_HEADER" -H "Content-Type: application/xml" \
-            --data-binary @"$GITHUB_WORKSPACE/sky.plist" \
+            --data-binary @"$GITHUB_WORKSPACE/$GITHUB_ASSET_PREFIX.plist" \
             "$UPLOAD_API/object?scope=$R2_SCOPE&name=$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$PLIST_NAME")"
           curl --fail --silent --show-error --retry 5 --retry-all-errors \
             -X PUT -H "$AUTH_HEADER" -H "Content-Type: image/png" \
-            --data-binary @"$GITHUB_WORKSPACE/sky.png" \
+            --data-binary @"$GITHUB_WORKSPACE/$GITHUB_ASSET_PREFIX.png" \
             "$UPLOAD_API/object?scope=$R2_SCOPE&name=$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$ICON_NAME")"
           curl --fail --silent --show-error --retry 5 --retry-all-errors \
             -X PUT -H "$AUTH_HEADER" -H "Content-Type: application/json" \
@@ -365,22 +369,22 @@ jobs:
             "$PLIST_URL" -o "$RUNNER_TEMP/r2-xu.plist"
           curl --fail --silent --show-error --retry 5 --retry-all-errors \
             "$ICON_URL" -o "$RUNNER_TEMP/r2-xu-icon.png"
-          cmp "$GITHUB_WORKSPACE/sky.plist" "$RUNNER_TEMP/r2-xu.plist"
-          cmp "$GITHUB_WORKSPACE/sky.png" "$RUNNER_TEMP/r2-xu-icon.png"
+          cmp "$GITHUB_WORKSPACE/$GITHUB_ASSET_PREFIX.plist" "$RUNNER_TEMP/r2-xu.plist"
+          cmp "$GITHUB_WORKSPACE/$GITHUB_ASSET_PREFIX.png" "$RUNNER_TEMP/r2-xu-icon.png"
           echo "Published $ACTUAL_SIZE bytes to $IPA_URL"
           echo "Published Xu install manifest to $PLIST_URL"
           echo "Published Xu app icon to $ICON_URL"
 
-      - name: Create or update sky.plist and sky.png on main
+      - name: Create or update installation assets on main
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- sky.plist sky.png
+          git add -- "$GITHUB_ASSET_PREFIX.plist" "$GITHUB_ASSET_PREFIX.png"
           if git diff --cached --quiet; then
-            echo "sky.plist and sky.png are already current"
+            echo "$GITHUB_ASSET_PREFIX.plist and $GITHUB_ASSET_PREFIX.png are already current"
             exit 0
           fi
-          git commit -m "Update Sky installation manifest and icon"
+          git commit -m "Update $GITHUB_ASSET_PREFIX installation manifest and icon"
           git pull --rebase origin main
           git push origin HEAD:main
