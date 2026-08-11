@@ -11,33 +11,33 @@
 					<key>kind</key>
 					<string>software-package</string>
 					<key>url</key>
-					<string>https://pub-6f7ffe944e2948a19530df1f8bd6fc9f.r2.dev/sky/Sky/com.tgc.sky.test.gold.ipa</string>
+					<string>https://pub-6f7ffe944e2948a19530df1f8bd6fc9f.r2.dev/sky/Sky/com.tgc.sky.ios.ipa</string>
 				</dict>
 				<dict>
 					<key>kind</key>
 					<string>display-image</string>
 					<key>url</key>
-					<string>https://pub-6f7ffe944e2948a19530df1f8bd6fc9f.r2.dev/sky/Sky/com.tgc.sky.test.gold.png</string>
+					<string>https://pub-6f7ffe944e2948a19530df1f8bd6fc9f.r2.dev/sky/Sky/com.tgc.sky.ios.png</string>
 				</dict>
 				<dict>
 					<key>kind</key>
 					<string>full-size-image</string>
 					<key>url</key>
-					<string>https://pub-6f7ffe944e2948a19530df1f8bd6fc9f.r2.dev/sky/Sky/com.tgc.sky.test.gold.png</string>
+					<string>https://pub-6f7ffe944e2948a19530df1f8bd6fc9f.r2.dev/sky/Sky/com.tgc.sky.ios.png</string>
 				</dict>
 			</array>
 			<key>metadata</key>
 			<dict>
 				<key>bundle-identifier</key>
-				<string>com.tgc.sky.test.gold</string>
+				<string>com.tgc.sky.ios</string>
 				<key>bundle-version</key>
-				<string>407852</string>
+				<string>407106</string>
 				<key>SkyBuildAccessKey</key>
-				<string>1743442389-4075f0fe8ceec4fc1a101fe5bcf24669bac728f2ad060fdbbd6cbb73e5855687</string>
+				<string>1743442606-386ccbddddd77c61b9ffcf7fa062f446baf1f5785d423a4b4c77a42c6624b375</string>
 				<key>kind</key>
 				<string>software</string>
 				<key>title</key>
-				<string>Sky Beta</string>
+				<string>Sky</string>
 			</dict>
 		</dict>
 	</array>
