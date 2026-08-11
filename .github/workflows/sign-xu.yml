@@ -1,6 +1,6 @@
-name: Inject Sky DEB and Sign IPA
+name: Inject Sky Plugin and Sign IPA
 
-run-name: Sky DEB ${{ inputs.request_id || github.run_id }}
+run-name: Sky ${{ inputs.plugin_source || 'deb' }} ${{ inputs.request_id || github.run_id }}
 
 on:
   workflow_dispatch:
@@ -9,6 +9,14 @@ on:
         description: Unique signing request ID
         required: false
         type: string
+      plugin_source:
+        description: Plugin source to inject
+        required: false
+        default: deb
+        type: choice
+        options:
+          - deb
+          - dylib
 
 permissions:
   contents: write
@@ -25,9 +33,10 @@ jobs:
     env:
       SOURCE_IPA_URL: https://pub-6f7ffe944e2948a19530df1f8bd6fc9f.r2.dev/sky/Sky.ipa
       PLUGIN_DEB_URL: https://pub-6f7ffe944e2948a19530df1f8bd6fc9f.r2.dev/sky/Sky.deb
+      PLUGIN_DYLIB_URL: https://pub-6f7ffe944e2948a19530df1f8bd6fc9f.r2.dev/sky/Sky.dylib
       UPLOAD_API: https://app.idkwhn.ccwu.cc/api/sky-upload
       R2_PUBLIC_BASE: https://pub-6f7ffe944e2948a19530df1f8bd6fc9f.r2.dev
-      R2_SCOPE: Sky
+      R2_SCOPE: ${{ inputs.plugin_source == 'dylib' && 'Xu' || 'Sky' }}
 
     steps:
       - name: Checkout main for sky.plist
@@ -81,22 +90,38 @@ jobs:
           test -s "$RUNNER_TEMP/Sky.ipa"
 
           PLUGIN_PATH=""
-          if curl --fail --location --silent --show-error \
-            --retry 3 --retry-all-errors "$PLUGIN_DEB_URL" -o "$RUNNER_TEMP/Sky.deb"; then
-            mkdir -p "$RUNNER_TEMP/deb"
-            dpkg-deb -x "$RUNNER_TEMP/Sky.deb" "$RUNNER_TEMP/deb"
-            PLUGIN_PATH="$(find "$RUNNER_TEMP/deb" -type f -iname '*.dylib' -print -quit)"
-            if [[ -n "$PLUGIN_PATH" ]] && file "$PLUGIN_PATH" | grep -q 'Mach-O'; then
-              echo "Using dylib extracted from Sky.deb"
-            else
-              PLUGIN_PATH=""
+          PLUGIN_SOURCE="${{ inputs.plugin_source || 'deb' }}"
+          if [[ "$PLUGIN_SOURCE" == "dylib" ]]; then
+            DYLIB_REQUEST_URL="${PLUGIN_DYLIB_URL}?signing_run=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+            if curl --fail --location --silent --show-error \
+              --retry 3 --retry-all-errors \
+              -H "Cache-Control: no-cache" -H "Pragma: no-cache" \
+              "$DYLIB_REQUEST_URL" -o "$RUNNER_TEMP/Sky.dylib" \
+              && file "$RUNNER_TEMP/Sky.dylib" | grep -q 'Mach-O'; then
+              PLUGIN_PATH="$RUNNER_TEMP/Sky.dylib"
+              echo "Using Sky.dylib"
             fi
+          elif [[ "$PLUGIN_SOURCE" == "deb" ]]; then
+            if curl --fail --location --silent --show-error \
+              --retry 3 --retry-all-errors "$PLUGIN_DEB_URL" -o "$RUNNER_TEMP/Sky.deb"; then
+              mkdir -p "$RUNNER_TEMP/deb"
+              dpkg-deb -x "$RUNNER_TEMP/Sky.deb" "$RUNNER_TEMP/deb"
+              PLUGIN_PATH="$(find "$RUNNER_TEMP/deb" -type f -iname '*.dylib' -print -quit)"
+              if [[ -n "$PLUGIN_PATH" ]] && file "$PLUGIN_PATH" | grep -q 'Mach-O'; then
+                echo "Using dylib extracted from Sky.deb"
+              else
+                PLUGIN_PATH=""
+              fi
+            fi
+          else
+            echo "Unsupported plugin source: $PLUGIN_SOURCE" >&2
+            exit 1
           fi
 
           if [[ -n "$PLUGIN_PATH" ]]; then
             printf '%s' "$PLUGIN_PATH" > "$RUNNER_TEMP/plugin-path"
           else
-            echo "Sky.deb is unavailable or has no valid dylib; signing without injection"
+            echo "Requested plugin is unavailable or invalid; signing without injection"
           fi
 
           mkdir -p "$RUNNER_TEMP/cert"
@@ -228,7 +253,7 @@ jobs:
           install -m 0644 "$ICON_PATH" "$GITHUB_WORKSPACE/sky.png"
           test -s "$GITHUB_WORKSPACE/sky.png"
           rm -rf "$RUNNER_TEMP/unpacked" "$RUNNER_TEMP/zsign-metadata" "$RUNNER_TEMP/deb"
-          rm -f "$RUNNER_TEMP/Sky.ipa" "$RUNNER_TEMP/cert.zip" "$RUNNER_TEMP/Sky.deb"
+          rm -f "$RUNNER_TEMP/Sky.ipa" "$RUNNER_TEMP/cert.zip" "$RUNNER_TEMP/Sky.deb" "$RUNNER_TEMP/Sky.dylib"
           df -h /
 
       - name: Multipart upload Xu IPA and install assets to R2
