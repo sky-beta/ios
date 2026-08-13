@@ -1,6 +1,6 @@
 name: Inject Sky Plugin and Sign IPA
 
-run-name: ${{ inputs.operation == 'cleanup' && 'Clean R2 multipart' || (inputs.operation == 'restore-beta' && 'Restore Sky Beta source' || (inputs.plugin_source == 'none' && 'iOS' || 'Sky')) }} ${{ inputs.operation == 'cleanup' && inputs.cleanup_name || (inputs.plugin_source || 'deb') }} ${{ inputs.request_id || github.run_id }}
+run-name: ${{ inputs.operation == 'cleanup' && 'Clean R2 multipart' || ((inputs.operation == 'restore-beta' || inputs.operation == 'restore-ios') && 'Restore IPA source' || (inputs.plugin_source == 'none' && 'iOS' || 'Sky')) }} ${{ inputs.operation == 'cleanup' && inputs.cleanup_name || (inputs.plugin_source || 'deb') }} ${{ inputs.request_id || github.run_id }}
 
 on:
   workflow_dispatch:
@@ -13,6 +13,7 @@ on:
         options:
           - sign
           - restore-beta
+          - restore-ios
           - cleanup
       request_id:
         description: Unique signing request ID
@@ -533,14 +534,14 @@ jobs:
           git pull --rebase origin main
           git push origin HEAD:main
 
-  restore_beta:
-    if: inputs.operation == 'restore-beta'
+  restore_source:
+    if: inputs.operation == 'restore-beta' || inputs.operation == 'restore-ios'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
       SOURCE_URL: https://koyeb.idkwhn.ccwu.cc/yan/ios.ipa
       UPLOAD_API: https://app.idkwhn.ccwu.cc/api/sky-upload
-      OBJECT_NAME: com.tgc.sky.test.gold.ipa
+      OBJECT_NAME: ${{ inputs.operation == 'restore-ios' && 'ios.ipa' || 'com.tgc.sky.test.gold.ipa' }}
       EXPECTED_BUNDLE_ID: com.tgc.sky.test.gold
     steps:
       - name: Download and validate Sky Beta source IPA
