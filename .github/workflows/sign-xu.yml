@@ -32,6 +32,7 @@ on:
         default: Xu
         type: choice
         options:
+          - all
           - root
           - Beta
           - Sky
@@ -50,8 +51,9 @@ permissions:
   contents: write
 
 concurrency:
-  group: sign-sky-${{ inputs.plugin_source || 'deb' }}-ipa
+  group: ${{ inputs.operation == 'cleanup' && format('r2-cleanup-{0}', github.run_id) || 'ipa-signing-global' }}
   cancel-in-progress: false
+  queue: max
 
 jobs:
   sign:
@@ -544,6 +546,14 @@ jobs:
         run: |
           set -euo pipefail
           test -n "$SKY_UPLOAD_TOKEN"
+          if [[ "$SCOPE" == "all" ]]; then
+            RESPONSE="$(curl --fail-with-body --silent --show-error --request POST \
+              -H "Authorization: Bearer $SKY_UPLOAD_TOKEN" \
+              "https://app.idkwhn.ccwu.cc/api/sky-upload/cleanup-all?minimum_age_seconds=900")"
+            python3 -c 'import json,sys; data=json.load(sys.stdin); assert data.get("success"); print(json.dumps(data, ensure_ascii=False))' \
+              <<<"$RESPONSE"
+            exit 0
+          fi
           test -n "$OBJECT_NAME"
           test -n "$UPLOAD_ID"
           QUERY="$(python3 - <<'PY'

@@ -12,8 +12,9 @@ permissions:
   contents: write
 
 concurrency:
-  group: sign-ipa
-  cancel-in-progress: true
+  group: ipa-signing-global
+  cancel-in-progress: false
+  queue: max
 
 jobs:
   sign:

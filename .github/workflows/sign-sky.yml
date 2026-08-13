@@ -14,8 +14,9 @@ permissions:
   contents: write
 
 concurrency:
-  group: sign-sky-beta-ipa
+  group: ipa-signing-global
   cancel-in-progress: false
+  queue: max
 
 jobs:
   sign:
