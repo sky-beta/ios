@@ -1,17 +1,18 @@
 name: Inject Sky Plugin and Sign IPA
 
-run-name: ${{ inputs.operation == 'cleanup' && 'Clean R2 multipart' || (inputs.plugin_source == 'none' && 'iOS' || 'Sky') }} ${{ inputs.operation == 'cleanup' && inputs.cleanup_name || (inputs.plugin_source || 'deb') }} ${{ inputs.request_id || github.run_id }}
+run-name: ${{ inputs.operation == 'cleanup' && 'Clean R2 multipart' || (inputs.operation == 'restore-beta' && 'Restore Sky Beta source' || (inputs.plugin_source == 'none' && 'iOS' || 'Sky')) }} ${{ inputs.operation == 'cleanup' && inputs.cleanup_name || (inputs.plugin_source || 'deb') }} ${{ inputs.request_id || github.run_id }}
 
 on:
   workflow_dispatch:
     inputs:
       operation:
-        description: Signing or exact multipart cleanup
+        description: Signing, source restoration, or exact multipart cleanup
         required: false
         default: sign
         type: choice
         options:
           - sign
+          - restore-beta
           - cleanup
       request_id:
         description: Unique signing request ID
@@ -57,7 +58,7 @@ concurrency:
 
 jobs:
   sign:
-    if: inputs.operation != 'cleanup'
+    if: inputs.operation == 'sign'
     runs-on: ubuntu-24.04
     timeout-minutes: 60
 
@@ -531,6 +532,110 @@ jobs:
           git commit -m "Update $GITHUB_ASSET_PREFIX installation manifest and icon"
           git pull --rebase origin main
           git push origin HEAD:main
+
+  restore_beta:
+    if: inputs.operation == 'restore-beta'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      SOURCE_URL: https://koyeb.idkwhn.ccwu.cc/yan/ios.ipa
+      UPLOAD_API: https://app.idkwhn.ccwu.cc/api/sky-upload
+      OBJECT_NAME: com.tgc.sky.test.gold.ipa
+      EXPECTED_BUNDLE_ID: com.tgc.sky.test.gold
+    steps:
+      - name: Download and validate Sky Beta source IPA
+        run: |
+          set -euo pipefail
+          sudo rm -rf /usr/local/lib/android /opt/ghc /usr/share/dotnet
+          curl --fail --location --silent --show-error --retry 8 --retry-all-errors \
+            "$SOURCE_URL" -o "$RUNNER_TEMP/beta-source.ipa"
+          test "$(stat -c %s "$RUNNER_TEMP/beta-source.ipa")" -gt 1073741824
+          python3 - <<'PY'
+          import os
+          import plistlib
+          import re
+          import zipfile
+          from pathlib import Path
+
+          ipa = Path(os.environ["RUNNER_TEMP"]) / "beta-source.ipa"
+          with zipfile.ZipFile(ipa) as archive:
+              matches = [name for name in archive.namelist()
+                         if re.fullmatch(r"Payload/[^/]+[.]app/Info[.]plist", name)]
+              if len(matches) != 1:
+                  raise SystemExit(f"Expected one main Info.plist, found {len(matches)}")
+              info = plistlib.loads(archive.read(matches[0]))
+          actual = str(info.get("CFBundleIdentifier", ""))
+          expected = os.environ["EXPECTED_BUNDLE_ID"]
+          if actual != expected:
+              raise SystemExit(f"Unexpected bundle ID: {actual!r}, expected {expected!r}")
+          print(f"Validated {actual} build {info.get('CFBundleVersion', '')}")
+          PY
+
+      - name: Restore source IPA to R2 atomically
+        env:
+          SKY_UPLOAD_TOKEN: ${{ secrets.SKY_UPLOAD_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$SKY_UPLOAD_TOKEN"
+          AUTH_HEADER="Authorization: Bearer $SKY_UPLOAD_TOKEN"
+          ENCODED_NAME="$(python3 -c 'import os,urllib.parse; print(urllib.parse.quote(os.environ["OBJECT_NAME"]))')"
+          CREATE_RESPONSE="$(curl --fail --silent --show-error --retry 5 --retry-all-errors \
+            -X POST -H "$AUTH_HEADER" "$UPLOAD_API/create?name=$ENCODED_NAME")"
+          UPLOAD_ID="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["upload_id"])' <<<"$CREATE_RESPONSE")"
+          test -n "$UPLOAD_ID"
+          printf '%s\n%s\n' "$UPLOAD_ID" "$OBJECT_NAME" > "$RUNNER_TEMP/restore-upload-id"
+          abort_upload() {
+            curl --silent --show-error --retry 3 --retry-all-errors -X POST -H "$AUTH_HEADER" \
+              "$UPLOAD_API/abort?name=$ENCODED_NAME&upload_id=$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$UPLOAD_ID")" \
+              >/dev/null || true
+          }
+          trap abort_upload ERR INT TERM
+          : > "$RUNNER_TEMP/restore-parts.jsonl"
+          PART_SIZE=$((64 * 1024 * 1024))
+          FILE_SIZE="$(stat -c %s "$RUNNER_TEMP/beta-source.ipa")"
+          PART_COUNT=$(((FILE_SIZE + PART_SIZE - 1) / PART_SIZE))
+          for PART_NUMBER in $(seq 1 "$PART_COUNT"); do
+            dd if="$RUNNER_TEMP/beta-source.ipa" of="$RUNNER_TEMP/restore-part.bin" \
+              bs="$PART_SIZE" skip=$((PART_NUMBER - 1)) count=1 status=none
+            curl --fail --silent --show-error --retry 5 --retry-all-errors \
+              -X PUT -H "$AUTH_HEADER" -H "Content-Type: application/octet-stream" \
+              --data-binary @"$RUNNER_TEMP/restore-part.bin" \
+              "$UPLOAD_API/part?name=$ENCODED_NAME&upload_id=$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$UPLOAD_ID")&part_number=$PART_NUMBER" \
+              >> "$RUNNER_TEMP/restore-parts.jsonl"
+            printf '\n' >> "$RUNNER_TEMP/restore-parts.jsonl"
+          done
+          rm -f "$RUNNER_TEMP/restore-part.bin"
+          export UPLOAD_ID OBJECT_NAME
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          root = Path(os.environ["RUNNER_TEMP"])
+          parts = [json.loads(line) for line in (root / "restore-parts.jsonl").read_text().splitlines() if line]
+          payload = {"upload_id": os.environ["UPLOAD_ID"], "name": os.environ["OBJECT_NAME"], "scope": "", "parts": parts}
+          (root / "restore-complete.json").write_text(json.dumps(payload), encoding="utf-8")
+          PY
+          curl --fail --silent --show-error --retry 5 --retry-all-errors \
+            -X POST -H "$AUTH_HEADER" -H "Content-Type: application/json" \
+            --data-binary @"$RUNNER_TEMP/restore-complete.json" "$UPLOAD_API/complete"
+          rm -f "$RUNNER_TEMP/restore-upload-id"
+          trap - ERR INT TERM
+
+      - name: Cleanup unfinished source multipart upload
+        if: ${{ always() }}
+        env:
+          SKY_UPLOAD_TOKEN: ${{ secrets.SKY_UPLOAD_TOKEN }}
+        run: |
+          set -euo pipefail
+          ID_FILE="$RUNNER_TEMP/restore-upload-id"
+          if [[ ! -s "$ID_FILE" ]]; then exit 0; fi
+          UPLOAD_ID="$(sed -n '1p' "$ID_FILE")"
+          NAME="$(sed -n '2p' "$ID_FILE")"
+          curl --silent --show-error --retry 3 --retry-all-errors -X POST \
+            -H "Authorization: Bearer $SKY_UPLOAD_TOKEN" \
+            "$UPLOAD_API/abort?name=$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$NAME")&upload_id=$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$UPLOAD_ID")" \
+            >/dev/null || true
+          rm -f "$ID_FILE"
 
   cleanup:
     if: inputs.operation == 'cleanup'
