@@ -102,6 +102,61 @@ jobs:
           PY
           df -h /
 
+      - name: Require the original IPA signing team
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          from zipfile import ZipFile
+
+          root = Path("${{ runner.temp }}")
+          with ZipFile(root / "Sky_Beta.ipa") as archive:
+              info_plists = [
+                  name for name in archive.namelist()
+                  if re.fullmatch(r"Payload/[^/]+[.]app/Info[.]plist", name)
+              ]
+              if len(info_plists) != 1:
+                  raise SystemExit(f"Expected one main Info.plist, found {len(info_plists)}")
+              app_root = info_plists[0].rsplit("/", 1)[0]
+              profile_name = app_root + "/embedded.mobileprovision"
+              if profile_name not in archive.namelist():
+                  raise SystemExit("Original IPA has no embedded.mobileprovision; refusing to replace its team")
+              (root / "original.mobileprovision").write_bytes(archive.read(profile_name))
+          PY
+          openssl smime -inform der -verify -noverify \
+            -in "$RUNNER_TEMP/original.mobileprovision" \
+            -out "$RUNNER_TEMP/original-profile.plist" >/dev/null 2>&1
+          openssl smime -inform der -verify -noverify \
+            -in "$RUNNER_TEMP/cert/signing.mobileprovision" \
+            -out "$RUNNER_TEMP/signing-profile.plist" >/dev/null 2>&1
+          python3 - <<'PY'
+          import plistlib
+          from pathlib import Path
+
+          root = Path("${{ runner.temp }}")
+          original = plistlib.loads((root / "original-profile.plist").read_bytes())
+          signing = plistlib.loads((root / "signing-profile.plist").read_bytes())
+
+          def first(data, key):
+              values = data.get(key) or []
+              return str(values[0]) if values else ""
+
+          original_team = first(original, "TeamIdentifier")
+          signing_team = first(signing, "TeamIdentifier")
+          original_prefix = first(original, "ApplicationIdentifierPrefix")
+          signing_prefix = first(signing, "ApplicationIdentifierPrefix")
+          if not original_team or not signing_team:
+              raise SystemExit("Unable to read TeamIdentifier from both profiles")
+          if original_team != signing_team or original_prefix != signing_prefix:
+              raise SystemExit(
+                  "Signing team mismatch: original IPA team "
+                  f"{original_team}/{original_prefix}, signing profile team "
+                  f"{signing_team}/{signing_prefix}. Refusing to replace the original team."
+              )
+          print(f"Verified unchanged signing team: {original_team}")
+          PY
+
       - name: Patch OAuth URL, read app metadata, and sign
         env:
           CERT_PASSWORD: ${{ secrets.CERT_PASSWORD }}
