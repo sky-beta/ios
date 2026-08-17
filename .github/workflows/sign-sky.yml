@@ -1,12 +1,16 @@
 name: Sign Sky Beta IPA
 
-run-name: Sky Beta ${{ inputs.request_id || github.run_id }}
+run-name: Sky Beta ${{ inputs.bundle_id || 'original-bundle' }} ${{ inputs.request_id || github.run_id }}
 
 on:
   workflow_dispatch:
     inputs:
       request_id:
         description: Unique signing request ID
+        required: false
+        type: string
+      bundle_id:
+        description: Optional new bundle ID; empty preserves the IPA Info.plist value
         required: false
         type: string
 
@@ -28,6 +32,7 @@ jobs:
       UPLOAD_API: https://app.idkwhn.ccwu.cc/api/sky-upload
       R2_PUBLIC_BASE: https://pub-6f7ffe944e2948a19530df1f8bd6fc9f.r2.dev
       R2_SCOPE: Beta
+      REQUESTED_BUNDLE_ID: ${{ inputs.bundle_id }}
 
     steps:
       - name: Checkout main for ios.plist
@@ -104,6 +109,7 @@ jobs:
           set -euo pipefail
           python3 - <<'PY'
           import json
+          import os
           import plistlib
           import re
           import struct
@@ -239,7 +245,9 @@ jobs:
 
               icon_path = max(icon_candidates, key=icon_score)
               (root / "sky-icon.png").write_bytes(convert_cgbi_png(archive.read(icon_path)))
-          bundle_id = str(info.get("CFBundleIdentifier", ""))
+          original_bundle_id = str(info.get("CFBundleIdentifier", ""))
+          requested_bundle_id = os.environ.get("REQUESTED_BUNDLE_ID", "").strip()
+          bundle_id = requested_bundle_id or original_bundle_id
           bundle_version = str(info.get("CFBundleVersion", ""))
           access_key = str(info.get("SkyBuildAccessKey", ""))
           title = str(info.get("CFBundleDisplayName") or info.get("CFBundleName") or "Sky Beta")
@@ -253,6 +261,9 @@ jobs:
           icon_url = object_base + ".png"
           metadata = {
               "bundle_id": bundle_id,
+              "original_bundle_id": original_bundle_id,
+              "bundle_id_changed": bundle_id != original_bundle_id,
+              "team_identifier_policy": "preserve-signing-profile",
               "bundle_version": bundle_version,
               "display_version": str(info.get("CFBundleShortVersionString", "")),
               "sky_build_access_key": access_key,
@@ -295,7 +306,9 @@ jobs:
           rm -rf "$RUNNER_TEMP/unpacked"
           unzip -q "$RUNNER_TEMP/Sky_Beta.ipa" -d "$RUNNER_TEMP/unpacked"
           python3 - <<'PY'
+          import os
           import plistlib
+          import re
           from pathlib import Path
 
           root = Path("${{ runner.temp }}")
@@ -304,7 +317,24 @@ jobs:
           if not apps:
               raise SystemExit("The IPA has no Payload/*.app bundle")
           app = apps[0]
-          info = plistlib.loads((app / "Info.plist").read_bytes())
+          info_path = app / "Info.plist"
+          info_bytes = info_path.read_bytes()
+          info = plistlib.loads(info_bytes)
+          original_bundle_id = str(info.get("CFBundleIdentifier", ""))
+          requested_bundle_id = os.environ.get("REQUESTED_BUNDLE_ID", "").strip()
+          if requested_bundle_id:
+              if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.-]{0,199}", requested_bundle_id):
+                  raise SystemExit("The requested bundle identifier is invalid")
+              info["CFBundleIdentifier"] = requested_bundle_id
+              plist_format = plistlib.FMT_BINARY if info_bytes.startswith(b"bplist00") else plistlib.FMT_XML
+              with info_path.open("wb") as output:
+                  plistlib.dump(info, output, fmt=plist_format, sort_keys=False)
+              info = plistlib.loads(info_path.read_bytes())
+              if str(info.get("CFBundleIdentifier", "")) != requested_bundle_id:
+                  raise SystemExit("The requested bundle identifier was not written exactly")
+              print(f"Changed main app bundle identifier: {original_bundle_id} -> {requested_bundle_id}")
+          else:
+              print(f"Preserved IPA bundle identifier: {original_bundle_id}")
           executable_name = str(info.get("CFBundleExecutable", ""))
           if not executable_name or "/" in executable_name or "\\" in executable_name:
               raise SystemExit("The IPA has an invalid CFBundleExecutable")

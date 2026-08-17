@@ -1,6 +1,6 @@
 name: Inject Sky Plugin and Sign IPA
 
-run-name: ${{ inputs.operation == 'cleanup' && 'Clean R2 multipart' || ((inputs.operation == 'restore-beta' || inputs.operation == 'restore-ios') && 'Restore IPA source' || (inputs.plugin_source == 'none' && 'iOS' || 'Sky')) }} ${{ inputs.operation == 'cleanup' && inputs.cleanup_name || (inputs.plugin_source || 'deb') }} ${{ inputs.request_id || github.run_id }}
+run-name: ${{ inputs.operation == 'cleanup' && 'Clean R2 multipart' || ((inputs.operation == 'restore-beta' || inputs.operation == 'restore-ios') && 'Restore IPA source' || (inputs.plugin_source == 'none' && 'iOS' || 'Sky')) }} ${{ inputs.operation == 'cleanup' && inputs.cleanup_name || (inputs.plugin_source || 'deb') }} ${{ inputs.bundle_id || 'original-bundle' }} ${{ inputs.request_id || github.run_id }}
 
 on:
   workflow_dispatch:
@@ -17,6 +17,10 @@ on:
           - cleanup
       request_id:
         description: Unique signing request ID
+        required: false
+        type: string
+      bundle_id:
+        description: Optional new bundle ID; empty preserves the IPA Info.plist value
         required: false
         type: string
       plugin_source:
@@ -71,6 +75,7 @@ jobs:
       R2_PUBLIC_BASE: https://pub-6f7ffe944e2948a19530df1f8bd6fc9f.r2.dev
       R2_SCOPE: ${{ inputs.plugin_source == 'none' && 'ios' || (inputs.plugin_source == 'dylib' && 'Xu' || 'Sky') }}
       GITHUB_ASSET_PREFIX: ${{ inputs.plugin_source == 'none' && 'ios-app' || (inputs.plugin_source == 'dylib' && 'xu' || 'sky') }}
+      REQUESTED_BUNDLE_ID: ${{ inputs.bundle_id }}
 
     steps:
       - name: Checkout main installation assets
@@ -193,6 +198,7 @@ jobs:
           unzip -q "$RUNNER_TEMP/Sky.ipa" -d "$RUNNER_TEMP/unpacked"
           python3 - <<'PY'
           import json
+          import os
           import plistlib
           import re
           from pathlib import Path
@@ -206,6 +212,7 @@ jobs:
           app = apps[0]
           info_path = app / "Info.plist"
           info = plistlib.loads(info_path.read_bytes())
+          plist_format = plistlib.FMT_BINARY if info_path.read_bytes().startswith(b"bplist00") else plistlib.FMT_XML
           executable_name = str(info.get("CFBundleExecutable", ""))
           if not executable_name or "/" in executable_name or "\\" in executable_name:
               raise SystemExit("The IPA has an invalid CFBundleExecutable")
@@ -275,7 +282,6 @@ jobs:
 
               old_hostname = "live.radiance.thatgamecompany.com"
               new_hostname = "sky.jljlb.vip"
-              plist_format = plistlib.FMT_BINARY if info_path.read_bytes().startswith(b"bplist00") else plistlib.FMT_XML
               replacements = 0
 
               def replace_plist_value(value):
@@ -320,6 +326,21 @@ jobs:
           else:
               print(f"Located main executable without hex modification: {executable}")
 
+          original_bundle_id = str(info.get("CFBundleIdentifier", ""))
+          requested_bundle_id = os.environ.get("REQUESTED_BUNDLE_ID", "").strip()
+          if requested_bundle_id:
+              if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.-]{0,199}", requested_bundle_id):
+                  raise SystemExit("The requested bundle identifier is invalid")
+              info["CFBundleIdentifier"] = requested_bundle_id
+              with info_path.open("wb") as output:
+                  plistlib.dump(info, output, fmt=plist_format, sort_keys=False)
+              info = plistlib.loads(info_path.read_bytes())
+              if str(info.get("CFBundleIdentifier", "")) != requested_bundle_id:
+                  raise SystemExit("The requested bundle identifier was not written exactly")
+              print(f"Changed main app bundle identifier: {original_bundle_id} -> {requested_bundle_id}")
+          else:
+              print(f"Preserved IPA bundle identifier: {original_bundle_id}")
+
           bundle_id = str(info.get("CFBundleIdentifier", ""))
           bundle_version = str(info.get("CFBundleVersion", ""))
           access_key = str(info.get("SkyBuildAccessKey", ""))
@@ -339,6 +360,9 @@ jobs:
           object_base = f"{public_base}/sky/${{ env.R2_SCOPE }}/{encoded_name}"
           metadata = {
               "bundle_id": bundle_id,
+              "original_bundle_id": original_bundle_id,
+              "bundle_id_changed": bundle_id != original_bundle_id,
+              "team_identifier_policy": "preserve-signing-profile",
               "bundle_version": bundle_version,
               "display_version": str(info.get("CFBundleShortVersionString", "")),
               "sky_build_access_key": access_key,
