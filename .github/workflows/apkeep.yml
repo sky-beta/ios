@@ -2,7 +2,7 @@ name: Download com.tgc.sky.android from Google Play
 
 on:
   schedule:
-    - cron: "0 * * * *"
+    - cron: "*/5 * * * *"
   workflow_dispatch:
     inputs:
       app_id:
@@ -86,11 +86,47 @@ jobs:
             echo 'HUAWEI_LOCATION_EOF'
           } >> "$GITHUB_OUTPUT"
 
+      - name: Read current Google Play version
+        id: play_version
+        shell: bash
+        run: |
+          set -euo pipefail
+          play_url="https://play.google.com/store/apps/details?id=${PACKAGE_NAME}&hl=en_US&gl=US"
+          curl --fail --silent --show-error --location \
+            --retry 3 --retry-delay 2 \
+            --user-agent 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/131 Safari/537.36' \
+            "$play_url" --output play-store.html
+          mapfile -t detected_version < <(python3 - <<'PY'
+          import re
+
+          with open("play-store.html", "r", encoding="utf-8") as source:
+              html = source.read()
+
+          match = re.search(
+              r'\[\[\["([0-9]+(?:\.[0-9]+)+) \(([0-9]+)\)"\]\],\[\[\[36\]\]',
+              html,
+          )
+          if not match:
+              raise SystemExit("Could not locate the current version on Google Play.")
+          print(match.group(1))
+          print(match.group(2))
+          PY
+          )
+          [[ "${#detected_version[@]}" == "2" ]] || {
+            echo "Google Play version parsing returned an unexpected result." >&2
+            exit 1
+          }
+          echo "version_name=${detected_version[0]}" >> "$GITHUB_OUTPUT"
+          echo "version_code=${detected_version[1]}" >> "$GITHUB_OUTPUT"
+          echo "Google Play version: ${detected_version[0]} (${detected_version[1]})"
+
       - name: Compare with the stored GitHub release
         id: compare
         shell: bash
         env:
           HUAWEI_LOCATION: ${{ steps.huawei.outputs.location }}
+          PLAY_VERSION_NAME: ${{ steps.play_version.outputs.version_name }}
+          PLAY_VERSION_CODE: ${{ steps.play_version.outputs.version_code }}
         run: |
           set -euo pipefail
           tag="apkeep-${PACKAGE_NAME}"
@@ -101,15 +137,24 @@ jobs:
           has_build_access_key=false
           sky_build_access_key=""
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json body,assets > current-release.json 2>/dev/null; then
-            old_location="$(jq -r '.body' current-release.json | sed -n 's/^Huawei redirect: //p' | tail -n 1)"
-            sky_build_access_key="$(jq -r '.body' current-release.json | sed -n 's/^SKY_BUILD_ACCESS_KEY: //p' | tail -n 1)"
+            release_body="$(jq -r '.body' current-release.json)"
+            old_location="$(sed -n 's/^Huawei redirect: //p' <<<"$release_body" | tail -n 1)"
+            old_version_line="$(sed -n 's/^Version: //p' <<<"$release_body" | head -n 1)"
+            old_version_name="$(sed -E 's/^([0-9]+(\.[0-9]+)*).*/\1/' <<<"$old_version_line")"
+            old_version_code="$(sed -n -E 's/.*\(([0-9]+)\).*/\1/p' <<<"$old_version_line" | head -n 1)"
+            sky_build_access_key="$(sed -n 's/^SKY_BUILD_ACCESS_KEY: //p' <<<"$release_body" | tail -n 1)"
             if [[ "$sky_build_access_key" =~ ^[0-9]{10}-[0-9a-fA-F]{64}$ ]]; then
               has_build_access_key=true
             fi
             asset_exists="$(jq -r --arg name "$asset" '[.assets[] | select(.name == $name)] | length' current-release.json)"
             dex_asset_exists="$(jq -r --arg name "$dex_asset" '[.assets[] | select(.name == $name)] | length' current-release.json)"
             buildconfig_asset_exists="$(jq -r --arg name "$buildconfig_asset" '[.assets[] | select(.name == $name)] | length' current-release.json)"
-            if [[ "$old_location" == "$HUAWEI_LOCATION" && "$asset_exists" == "1" && "$dex_asset_exists" == "1" && "$buildconfig_asset_exists" == "1" ]]; then
+            if [[ "$old_location" == "$HUAWEI_LOCATION" \
+              && "$old_version_name" == "$PLAY_VERSION_NAME" \
+              && "$old_version_code" == "$PLAY_VERSION_CODE" \
+              && "$asset_exists" == "1" \
+              && "$dex_asset_exists" == "1" \
+              && "$buildconfig_asset_exists" == "1" ]]; then
               changed=false
             fi
           fi
@@ -180,19 +225,8 @@ jobs:
           echo "version_code=${version_code:-unknown}" >> "$GITHUB_OUTPUT"
           echo "sha256=$(sha256sum "release/${PACKAGE_NAME}.apk" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
 
-      - name: Retrieve cached APK for metadata
-        if: steps.compare.outputs.changed != 'true' && steps.compare.outputs.has_build_access_key != 'true'
-        shell: bash
-        env:
-          TAG: ${{ steps.compare.outputs.tag }}
-          ASSET: ${{ steps.compare.outputs.asset }}
-        run: |
-          set -euo pipefail
-          mkdir -p release
-          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "$ASSET" --dir release
-
       - name: Read SKY_BUILD_ACCESS_KEY from BuildConfig
-        if: steps.compare.outputs.changed == 'true' || steps.compare.outputs.has_build_access_key != 'true'
+        if: steps.compare.outputs.changed == 'true'
         id: build_config
         shell: bash
         run: |
@@ -259,6 +293,7 @@ jobs:
           gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --title "$PACKAGE_NAME" --notes "$notes"
 
       - name: Record successful check time
+        if: steps.compare.outputs.changed == 'true'
         shell: bash
         env:
           TAG: ${{ steps.compare.outputs.tag }}
@@ -280,6 +315,7 @@ jobs:
           gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes "$updated_body"
 
       - name: Update Pages status data
+        if: steps.compare.outputs.changed == 'true'
         shell: bash
         env:
           TAG: ${{ steps.compare.outputs.tag }}
