@@ -46,6 +46,8 @@ jobs:
     env:
       PACKAGE_NAME: com.tgc.sky.android
       HUAWEI_APP_URL: ${{ vars.HUAWEI_APP_URL }}
+      HUAWEI_DEV_APP_URL_1: ${{ vars.HUAWEI_DEV_APP_URL_1 }}
+      HUAWEI_DEV_APP_URL_2: ${{ vars.HUAWEI_DEV_APP_URL_2 }}
       GOOGLE_PLAY_EMAIL: ${{ secrets.GOOGLE_PLAY_EMAIL }}
       GOOGLE_PLAY_AAS_TOKEN: ${{ secrets.GOOGLE_PLAY_AAS_TOKEN }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -68,7 +70,7 @@ jobs:
               exit 1
             }
           fi
-          for name in GOOGLE_PLAY_EMAIL GOOGLE_PLAY_AAS_TOKEN GH_TOKEN HUAWEI_APP_URL; do
+          for name in GOOGLE_PLAY_EMAIL GOOGLE_PLAY_AAS_TOKEN GH_TOKEN HUAWEI_APP_URL HUAWEI_DEV_APP_URL_1 HUAWEI_DEV_APP_URL_2; do
             [[ -n "${!name:-}" ]] || { echo "Missing secret: $name" >&2; exit 1; }
           done
 
@@ -85,6 +87,60 @@ jobs:
             echo "$location"
             echo 'HUAWEI_LOCATION_EOF'
           } >> "$GITHUB_OUTPUT"
+
+      - name: Read additional Huawei 302 fingerprints
+        id: huawei_dev
+        shell: bash
+        run: |
+          set -euo pipefail
+          read_location() {
+            local app_url="$1"
+            local headers location
+            headers="$(curl --fail --silent --show-error --dump-header - --output /dev/null --max-redirs 0 "$app_url")"
+            location="$(sed -n 's/^[Ll]ocation:[[:space:]]*//p' <<<"$headers" | tr -d '\r' | tail -n 1)"
+            [[ -n "$location" ]] || { echo "Huawei URL did not return a 302 Location." >&2; return 1; }
+            printf '%s' "$location"
+          }
+          location_1="$(read_location "$HUAWEI_DEV_APP_URL_1")"
+          location_2="$(read_location "$HUAWEI_DEV_APP_URL_2")"
+          {
+            echo 'location_1<<HUAWEI_DEV_LOCATION_1_EOF'
+            echo "$location_1"
+            echo 'HUAWEI_DEV_LOCATION_1_EOF'
+            echo 'location_2<<HUAWEI_DEV_LOCATION_2_EOF'
+            echo "$location_2"
+            echo 'HUAWEI_DEV_LOCATION_2_EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Compare additional Huawei addresses
+        id: compare_dev
+        shell: bash
+        env:
+          DEV_LOCATION_1: ${{ steps.huawei_dev.outputs.location_1 }}
+          DEV_LOCATION_2: ${{ steps.huawei_dev.outputs.location_2 }}
+        run: |
+          set -euo pipefail
+          dev_file="bese/${PACKAGE_NAME}/dev.json"
+          old_location_1=""
+          old_location_2=""
+          old_count=0
+          if [[ -f "$dev_file" ]]; then
+            old_location_1="$(jq -r '.downloads.C105123359 // empty' "$dev_file")"
+            old_location_2="$(jq -r '.downloads.C105124145 // empty' "$dev_file")"
+            old_count="$(jq -r '.update_count // 0' "$dev_file")"
+          fi
+          changed_1=false
+          changed_2=false
+          [[ "$old_location_1" == "$DEV_LOCATION_1" ]] || changed_1=true
+          [[ "$old_location_2" == "$DEV_LOCATION_2" ]] || changed_2=true
+          changed=false
+          if [[ "$changed_1" == "true" || "$changed_2" == "true" ]]; then
+            changed=true
+          fi
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+          echo "changed_1=$changed_1" >> "$GITHUB_OUTPUT"
+          echo "changed_2=$changed_2" >> "$GITHUB_OUTPUT"
+          echo "old_count=$old_count" >> "$GITHUB_OUTPUT"
 
       - name: Read current Google Play version
         id: play_version
@@ -372,6 +428,88 @@ jobs:
             git commit -m "Update APK check status"
             git push
           fi
+
+      - name: Update additional Huawei address data
+        if: steps.compare_dev.outputs.changed == 'true'
+        id: update_dev
+        shell: bash
+        env:
+          DEV_LOCATION_1: ${{ steps.huawei_dev.outputs.location_1 }}
+          DEV_LOCATION_2: ${{ steps.huawei_dev.outputs.location_2 }}
+          OLD_COUNT: ${{ steps.compare_dev.outputs.old_count }}
+        run: |
+          set -euo pipefail
+          package_dir="bese/${PACKAGE_NAME}"
+          mkdir -p "$package_dir"
+          [[ "$OLD_COUNT" =~ ^[0-9]+$ ]] || { echo "Invalid update_count: $OLD_COUNT" >&2; exit 1; }
+          update_count="$((OLD_COUNT + 1))"
+          updated_at="$(TZ=Asia/Shanghai date '+%Y-%m-%dT%H:%M:%S%:z')"
+          jq -n \
+            --argjson update_count "$update_count" \
+            --arg updated_at "$updated_at" \
+            --arg location_1 "$DEV_LOCATION_1" \
+            --arg location_2 "$DEV_LOCATION_2" \
+            '{update_count:$update_count,last_updated:$updated_at,downloads:{C105123359:$location_1,C105124145:$location_2}}' \
+            > "$package_dir/dev.json"
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add "$package_dir/dev.json"
+          if git diff --cached --quiet; then
+            echo "Expected dev.json to change, but no difference was found." >&2
+            exit 1
+          fi
+          git commit -m "Update developer download URLs ($update_count)"
+          git push
+          echo "update_count=$update_count" >> "$GITHUB_OUTPUT"
+          echo "updated_at=$updated_at" >> "$GITHUB_OUTPUT"
+
+      - name: Send address change email
+        if: steps.compare_dev.outputs.changed == 'true' && steps.update_dev.outcome == 'success'
+        shell: bash
+        env:
+          SMTP_USERNAME: ${{ secrets.ALERT_SMTP_USERNAME }}
+          SMTP_AUTH_CODE: ${{ secrets.ALERT_SMTP_AUTH_CODE }}
+          EMAIL_TO: ${{ secrets.ALERT_EMAIL_TO }}
+          DEV_LOCATION_1: ${{ steps.huawei_dev.outputs.location_1 }}
+          DEV_LOCATION_2: ${{ steps.huawei_dev.outputs.location_2 }}
+          CHANGED_1: ${{ steps.compare_dev.outputs.changed_1 }}
+          CHANGED_2: ${{ steps.compare_dev.outputs.changed_2 }}
+          UPDATE_COUNT: ${{ steps.update_dev.outputs.update_count }}
+          UPDATED_AT: ${{ steps.update_dev.outputs.updated_at }}
+        run: |
+          set -euo pipefail
+          for name in SMTP_USERNAME SMTP_AUTH_CODE EMAIL_TO; do
+            [[ -n "${!name:-}" ]] || { echo "Missing email secret: $name" >&2; exit 1; }
+          done
+          python3 - <<'PY'
+          import os
+          import smtplib
+          import ssl
+          from email.message import EmailMessage
+
+          changed = []
+          if os.environ["CHANGED_1"] == "true":
+              changed.append("C105123359")
+          if os.environ["CHANGED_2"] == "true":
+              changed.append("C105124145")
+
+          message = EmailMessage()
+          message["Subject"] = f"AppGallery address updated ({os.environ['UPDATE_COUNT']})"
+          message["From"] = os.environ["SMTP_USERNAME"]
+          message["To"] = os.environ["EMAIL_TO"]
+          message.set_content(
+              "AppGallery download address change detected.\n\n"
+              f"Changed app IDs: {', '.join(changed)}\n"
+              f"Update count: {os.environ['UPDATE_COUNT']}\n"
+              f"Updated at: {os.environ['UPDATED_AT']}\n\n"
+              f"C105123359: {os.environ['DEV_LOCATION_1']}\n"
+              f"C105124145: {os.environ['DEV_LOCATION_2']}\n"
+          )
+
+          with smtplib.SMTP_SSL("smtp.qq.com", 465, context=ssl.create_default_context()) as smtp:
+              smtp.login(os.environ["SMTP_USERNAME"], os.environ["SMTP_AUTH_CODE"])
+              smtp.send_message(message)
+          PY
 
       - name: Publish result
         shell: bash
