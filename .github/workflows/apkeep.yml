@@ -152,8 +152,22 @@ jobs:
           [[ -n "$apk_file" ]] || apk_file="$(find downloads -type f -iname '*.apk' -print -quit)"
           [[ -n "$apk_file" ]] || { echo "APKeep did not produce an APK." >&2; exit 1; }
           cp "$apk_file" "release/${PACKAGE_NAME}.apk"
-          unzip -p "release/${PACKAGE_NAME}.apk" classes2.dex > release/classes2.dex
-          [[ -s release/classes2.dex ]] || { echo "classes2.dex is missing or empty." >&2; exit 1; }
+
+          buildconfig_dex=""
+          while IFS= read -r dex_entry; do
+            unzip -p "release/${PACKAGE_NAME}.apk" "$dex_entry" > release/buildconfig-candidate.dex
+            if strings -a release/buildconfig-candidate.dex | grep -Fxq 'Lcom/tgc/sky/BuildConfig;'; then
+              mv release/buildconfig-candidate.dex release/classes2.dex
+              buildconfig_dex="$dex_entry"
+              break
+            fi
+          done < <(unzip -Z1 "release/${PACKAGE_NAME}.apk" | grep -E '^classes([0-9]+)?\.dex$' | sort -V)
+          rm -f release/buildconfig-candidate.dex
+          [[ -n "$buildconfig_dex" && -s release/classes2.dex ]] || {
+            echo "Could not find Lcom/tgc/sky/BuildConfig; in any classes*.dex file." >&2
+            exit 1
+          }
+          echo "Located BuildConfig in $buildconfig_dex"
 
           aapt_bin="$(find "${ANDROID_HOME}/build-tools" -type f -name aapt -print 2>/dev/null | sort -V | tail -n 1)"
           badging="$($aapt_bin dump badging "release/${PACKAGE_NAME}.apk" 2>/dev/null | head -n 1 || true)"
