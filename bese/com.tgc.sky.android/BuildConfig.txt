@@ -15,12 +15,12 @@ public final class BuildConfig {
     public static final String NINTENDO_USER = "";
     public static final String PLATFORM = "android";
     public static final String SKY_BRANCH_NAME = "Live";
-    public static final String SKY_BUILD_ACCESS_KEY = "1743442606-8d3bc4967416ca868097b391ff9a5101b2a7bb0440e309bc1a9fe884bda7fd9d";
+    public static final String SKY_BUILD_ACCESS_KEY = "1743442606-dc4e25ed6ddddb282e2246572b571a225c2d52d8e79feef9883da5f46d7fe2c2";
     public static final boolean SKY_ENABLE_GAMEPAD_ASSETS = true;
     public static final boolean SKY_ENABLE_ODR = true;
     public static final String SKY_SERVER_HOSTNAME = "live.radiance.thatgamecompany.com";
     public static final String SKY_STAGE_NAME = "Live";
-    public static final String SKY_VERSION = "0.34.3";
-    public static final int VERSION_CODE = 408160;
-    public static final String VERSION_NAME = "0.34.3 (408160)";
+    public static final String SKY_VERSION = "0.34.5";
+    public static final int VERSION_CODE = 410941;
+    public static final String VERSION_NAME = "0.34.5 (410941)";
 }

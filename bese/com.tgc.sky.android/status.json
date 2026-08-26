@@ -1,8 +1,8 @@
 {
   "package": "com.tgc.sky.android",
-  "version": "0.34.3",
-  "version_code": "408160",
-  "sky_build_access_key": "1743442606-8d3bc4967416ca868097b391ff9a5101b2a7bb0440e309bc1a9fe884bda7fd9d",
-  "last_checked": "2026-08-26T03:35:04+08:00",
-  "huawei_download_url": "https://appdlc-dra.hispace.dbankcloud.com/dl/appdl/application/apk/52/5281aa5b9c3043df8aa54fb13d86ddf9/com.tgc.sky.android.huawei.2607301856.apk?maple=0&trackId=0&distOpEntity=HKS"
+  "version": "0.34.5",
+  "version_code": "410941",
+  "sky_build_access_key": "1743442606-dc4e25ed6ddddb282e2246572b571a225c2d52d8e79feef9883da5f46d7fe2c2",
+  "last_checked": "2026-08-26T11:54:32+08:00",
+  "huawei_download_url": "https://appdlc-dra.hispace.dbankcloud.com/dl/appdl/application/apk/87/876c764111f04833b6197a073476547a/com.tgc.sky.android.huawei.2608191027.apk?maple=0&trackId=0&distOpEntity=HKS"
 }
