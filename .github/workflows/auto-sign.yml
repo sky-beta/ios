@@ -87,59 +87,50 @@ jobs:
             "全能签.ipa"
           test -s dist/quan.ipa
 
-      - name: Overwrite GitHub fallback
+      - name: Publish R2 and GitHub fallback in parallel
+        id: publish
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          gh release upload signed-latest dist/quan.ipa --clobber || {
-            gh release create signed-latest \
-              --target "$GITHUB_SHA" \
-              --title "Latest signed IPA" \
-              --notes "Automatically signed by GitHub Actions."
-            gh release upload signed-latest dist/quan.ipa --clobber
-          }
-
-      - name: Overwrite R2 signed IPA
-        id: r2_upload
-        continue-on-error: true
-        env:
           SKY_UPLOAD_TOKEN: ${{ secrets.SKY_UPLOAD_TOKEN }}
           UPLOAD_API: https://app.idkwhn.ccwu.cc/api/sky-upload
         run: |
           set -euo pipefail
-          test -n "$SKY_UPLOAD_TOKEN"
-          auth="Authorization: Bearer $SKY_UPLOAD_TOKEN"
-          query="name=quan.ipa&scope="
-          created="$(curl --fail-with-body --silent --show-error --retry 5 --retry-all-errors \
-            -X POST -H "$auth" "$UPLOAD_API/create?$query")"
-          upload_id="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["upload_id"])' <<<"$created")"
-          abort() {
-            curl --silent --show-error --retry 3 --retry-all-errors -X POST -H "$auth" \
-              "$UPLOAD_API/abort?$query&upload_id=$upload_id" >/dev/null || true
+          publish_github() {
+            gh release upload signed-latest dist/quan.ipa --clobber || {
+              gh release create signed-latest \
+                --target "$GITHUB_SHA" \
+                --title "Latest signed IPA" \
+                --notes "Automatically signed by GitHub Actions."
+              gh release upload signed-latest dist/quan.ipa --clobber
+            }
           }
-          trap abort ERR INT TERM
-          part="$(curl --fail-with-body --silent --show-error --retry 5 --retry-all-errors \
-            -X PUT -H "$auth" --data-binary @dist/quan.ipa \
-            "$UPLOAD_API/part?$query&upload_id=$upload_id&part_number=1")"
-          etag="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["etag"])' <<<"$part")"
-          python3 - "$upload_id" "$etag" > "$RUNNER_TEMP/r2-complete.json" <<'PY'
-          import json, sys
-          print(json.dumps({
-              "upload_id": sys.argv[1],
-              "name": "quan.ipa",
-              "scope": "",
-              "parts": [{"partNumber": 1, "etag": sys.argv[2]}],
-          }))
-          PY
-          curl --fail-with-body --silent --show-error --retry 5 --retry-all-errors \
-            -X POST -H "$auth" -H "Content-Type: application/json" \
-            --data-binary @"$RUNNER_TEMP/r2-complete.json" "$UPLOAD_API/complete"
-          trap - ERR INT TERM
+          publish_r2() {
+            test -n "$SKY_UPLOAD_TOKEN"
+            curl --fail-with-body --silent --show-error --retry 2 --retry-all-errors \
+              -X PUT -H "Authorization: Bearer $SKY_UPLOAD_TOKEN" \
+              --data-binary @dist/quan.ipa \
+              "$UPLOAD_API/object?name=quan.ipa&scope="
+          }
+          publish_github >"$RUNNER_TEMP/github-publish.log" 2>&1 & github_pid=$!
+          publish_r2 >"$RUNNER_TEMP/r2-publish.log" 2>&1 & r2_pid=$!
+          r2_ok=true
+          if ! wait "$r2_pid"; then r2_ok=false; fi
+          if ! wait "$github_pid"; then
+            cat "$RUNNER_TEMP/github-publish.log"
+            exit 1
+          fi
+          cat "$RUNNER_TEMP/github-publish.log"
+          if [[ "$r2_ok" == "true" ]]; then
+            cat "$RUNNER_TEMP/r2-publish.log"
+            echo "r2_ok=true" >> "$GITHUB_OUTPUT"
+          else
+            cat "$RUNNER_TEMP/r2-publish.log" >&2
+            echo "r2_ok=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Report distribution source
         run: |
-          if [[ "${{ steps.r2_upload.outcome }}" == "success" ]]; then
+          if [[ "${{ steps.publish.outputs.r2_ok }}" == "true" ]]; then
             echo "Signed IPA overwritten in R2; installation will prefer R2." >> "$GITHUB_STEP_SUMMARY"
           else
             echo "R2 upload failed; GitHub Release remains the installation fallback." >> "$GITHUB_STEP_SUMMARY"
