@@ -2,11 +2,6 @@ name: Sign IPA
 
 on:
   workflow_dispatch:
-  push:
-    branches: [sky-beta-cache-request-headers]
-    paths:
-      - quan.ipa
-      - .github/workflows/auto-sign.yml
 
 permissions:
   contents: write
@@ -14,7 +9,6 @@ permissions:
 concurrency:
   group: ipa-signing-global
   cancel-in-progress: false
-  queue: max
 
 jobs:
   sign:
@@ -22,7 +16,13 @@ jobs:
     timeout-minutes: 20
 
     steps:
-      - uses: actions/checkout@v6
+      - name: Check out source IPA from main
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          sparse-checkout: |
+            全能签.ipa
+          sparse-checkout-cone-mode: false
 
       - name: Restore zsign cache
         id: zsign-cache
@@ -48,17 +48,17 @@ jobs:
           test -x .tools/zsign
           .tools/zsign --version
 
-      - name: Download certificate from R2 and sign
+      - name: Download certificate from R2 and sign main source
         env:
           CERT_ZIP_URL: ${{ secrets.CERT_ZIP_URL }}
           CERT_PASSWORD: ${{ secrets.CERT_PASSWORD }}
         run: |
           set -euo pipefail
-          test -s quan.ipa
+          test -s "全能签.ipa"
           test -n "$CERT_ZIP_URL"
           test -n "$CERT_PASSWORD"
           mkdir -p "$RUNNER_TEMP/cert" dist
-          curl --fail --location --silent --show-error \
+          curl --fail --location --silent --show-error --retry 5 --retry-all-errors \
             "$CERT_ZIP_URL" -o "$RUNNER_TEMP/cert.zip"
           python3 - <<'PY'
           from pathlib import Path
@@ -84,10 +84,10 @@ jobs:
             -m "$RUNNER_TEMP/cert/signing.mobileprovision" \
             -z 6 \
             -o dist/quan.ipa \
-            quan.ipa
+            "全能签.ipa"
           test -s dist/quan.ipa
 
-      - name: Publish fixed download URL
+      - name: Overwrite GitHub fallback
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -99,3 +99,48 @@ jobs:
               --notes "Automatically signed by GitHub Actions."
             gh release upload signed-latest dist/quan.ipa --clobber
           }
+
+      - name: Overwrite R2 signed IPA
+        id: r2_upload
+        continue-on-error: true
+        env:
+          SKY_UPLOAD_TOKEN: ${{ secrets.SKY_UPLOAD_TOKEN }}
+          UPLOAD_API: https://app.idkwhn.ccwu.cc/api/sky-upload
+        run: |
+          set -euo pipefail
+          test -n "$SKY_UPLOAD_TOKEN"
+          auth="Authorization: Bearer $SKY_UPLOAD_TOKEN"
+          query="name=quan.ipa&scope="
+          created="$(curl --fail-with-body --silent --show-error --retry 5 --retry-all-errors \
+            -X POST -H "$auth" "$UPLOAD_API/create?$query")"
+          upload_id="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["upload_id"])' <<<"$created")"
+          abort() {
+            curl --silent --show-error --retry 3 --retry-all-errors -X POST -H "$auth" \
+              "$UPLOAD_API/abort?$query&upload_id=$upload_id" >/dev/null || true
+          }
+          trap abort ERR INT TERM
+          part="$(curl --fail-with-body --silent --show-error --retry 5 --retry-all-errors \
+            -X PUT -H "$auth" --data-binary @dist/quan.ipa \
+            "$UPLOAD_API/part?$query&upload_id=$upload_id&part_number=1")"
+          etag="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["etag"])' <<<"$part")"
+          python3 - "$upload_id" "$etag" > "$RUNNER_TEMP/r2-complete.json" <<'PY'
+          import json, sys
+          print(json.dumps({
+              "upload_id": sys.argv[1],
+              "name": "quan.ipa",
+              "scope": "",
+              "parts": [{"partNumber": 1, "etag": sys.argv[2]}],
+          }))
+          PY
+          curl --fail-with-body --silent --show-error --retry 5 --retry-all-errors \
+            -X POST -H "$auth" -H "Content-Type: application/json" \
+            --data-binary @"$RUNNER_TEMP/r2-complete.json" "$UPLOAD_API/complete"
+          trap - ERR INT TERM
+
+      - name: Report distribution source
+        run: |
+          if [[ "${{ steps.r2_upload.outcome }}" == "success" ]]; then
+            echo "Signed IPA overwritten in R2; installation will prefer R2." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "R2 upload failed; GitHub Release remains the installation fallback." >> "$GITHUB_STEP_SUMMARY"
+          fi
