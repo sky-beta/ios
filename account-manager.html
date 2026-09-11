@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="清风落樱 AccountManager：光遇多账号管理与任务编排工具。">
+  <title>清风落樱 · AccountManager</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07111f;
+      --panel: rgba(16, 31, 53, .78);
+      --line: rgba(172, 211, 255, .17);
+      --text: #edf6ff;
+      --muted: #a7bad0;
+      --accent: #70d6ff;
+      --accent-2: #b59cff;
+      --success: #83e6b1;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-width: 320px;
+      color: var(--text);
+      font: 16px/1.7 system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+      background:
+        radial-gradient(circle at 12% 0%, rgba(112, 214, 255, .24), transparent 34rem),
+        radial-gradient(circle at 92% 10%, rgba(181, 156, 255, .2), transparent 32rem),
+        var(--bg);
+    }
+
+    a { color: inherit; }
+    .wrap { width: min(1120px, calc(100% - 40px)); margin: 0 auto; }
+    header { padding: 26px 0 72px; }
+    nav { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+    .brand { font-weight: 800; letter-spacing: .04em; }
+    .brand span { color: var(--accent); }
+    .nav-link {
+      color: var(--muted);
+      text-decoration: none;
+      border-bottom: 1px solid transparent;
+    }
+    .nav-link:hover { color: var(--text); border-color: var(--accent); }
+    .hero { max-width: 760px; padding-top: 90px; }
+    .eyebrow {
+      color: var(--success);
+      font-size: .82rem;
+      font-weight: 800;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+    }
+    h1 { margin: 12px 0 20px; font-size: clamp(2.5rem, 7vw, 5.7rem); line-height: 1.05; letter-spacing: -.06em; }
+    .hero p { color: var(--muted); font-size: clamp(1.05rem, 2vw, 1.25rem); max-width: 650px; }
+    .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
+    .button {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-height: 46px; padding: 0 19px; border-radius: 999px;
+      color: #06111c; background: var(--accent); text-decoration: none; font-weight: 800;
+    }
+    .button.secondary { color: var(--text); background: transparent; border: 1px solid var(--line); }
+    main { padding-bottom: 70px; }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .card, .status {
+      padding: 24px; border: 1px solid var(--line); border-radius: 22px;
+      background: linear-gradient(145deg, var(--panel), rgba(11, 21, 37, .6));
+      box-shadow: 0 18px 60px rgba(0, 0, 0, .15);
+    }
+    .card h2 { margin: 0 0 8px; font-size: 1.15rem; }
+    .card p { margin: 0; color: var(--muted); }
+    .section { margin-top: 70px; }
+    .section h2 { margin: 0 0 18px; font-size: 1.7rem; }
+    .status { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 18px; }
+    .status strong { display: block; font-size: 1.1rem; }
+    .status small { color: var(--muted); }
+    .pill { color: var(--success); font-weight: 700; }
+    code { color: var(--accent); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+    footer { padding: 26px 0 40px; color: var(--muted); border-top: 1px solid var(--line); font-size: .9rem; }
+    @media (max-width: 760px) {
+      header { padding-bottom: 45px; }
+      .hero { padding-top: 65px; }
+      .grid { grid-template-columns: 1fr; }
+      .wrap { width: min(100% - 28px, 1120px); }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <nav aria-label="主导航">
+        <div class="brand">清风<span>·</span>落樱</div>
+        <a class="nav-link" href="https://github.com/sky-beta/ios">查看 GitHub 仓库</a>
+      </nav>
+      <div class="hero">
+        <div class="eyebrow">AccountManager / Android</div>
+        <h1>让光遇账号管理更简单。</h1>
+        <p>一个面向国服与国际服的 Android 多账号管理工具，集中处理登录凭证、每日任务、赛道奖励和在线跑图。</p>
+        <div class="actions">
+          <a class="button" href="https://github.com/sky-beta/ios">打开源码</a>
+          <a class="button secondary" href="#features">了解功能</a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section id="features" class="grid" aria-label="主要功能">
+      <article class="card">
+        <h2>多账号管理</h2>
+        <p>统一保存和续期账号凭证，支持国服与国际服切换。</p>
+      </article>
+      <article class="card">
+        <h2>任务编排</h2>
+        <p>安排每日任务、赛道奖励、在线跑图和混沌爱心等流程。</p>
+      </article>
+      <article class="card">
+        <h2>运行状态</h2>
+        <p>通过悬浮窗查看任务进度，配合后台服务保持任务运行。</p>
+      </article>
+    </section>
+
+    <section class="section">
+      <h2>项目状态</h2>
+      <div class="status">
+        <div>
+          <strong>GitHub Pages 部署已启用</strong>
+          <small>页面由仓库中的 <code>.github/workflows/deploy-pages.yml</code> 自动发布。</small>
+        </div>
+        <div class="pill">● 静态页面</div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">清风落樱 · AccountManager <span aria-hidden="true">·</span> 页面仅用于项目介绍，App 内容由其开发者负责。</div>
+  </footer>
+</body>
+</html>
