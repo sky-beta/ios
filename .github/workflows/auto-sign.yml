@@ -24,6 +24,45 @@ jobs:
             全能签.ipa
           sparse-checkout-cone-mode: false
 
+      - name: Prefer remote IPA, fall back to main repository
+        env:
+          PRIMARY_IPA_URL: https://sign.drnrt8.cn/sign/sign/IPA/%E5%85%A8%E8%83%BD%E7%AD%BE.ipa
+        run: |
+          set -euo pipefail
+          validate_ipa() {
+            python3 - "$1" <<'PY'
+          import plistlib, sys, zipfile
+          with zipfile.ZipFile(sys.argv[1]) as archive:
+              infos = [n for n in archive.namelist() if n.startswith('Payload/') and n.count('/') == 2 and n.endswith('.app/Info.plist')]
+              if len(infos) != 1:
+                  raise SystemExit('IPA must contain one main app Info.plist')
+              info = plistlib.loads(archive.read(infos[0]))
+              executable = info.get('CFBundleExecutable')
+              if not info.get('CFBundleIdentifier') or not executable:
+                  raise SystemExit('IPA metadata is incomplete')
+              if infos[0].rsplit('/', 1)[0] + '/' + executable not in archive.namelist():
+                  raise SystemExit('IPA executable is missing')
+              if archive.testzip() is not None:
+                  raise SystemExit('IPA CRC validation failed')
+              print('Validated IPA:', info['CFBundleIdentifier'], info.get('CFBundleVersion', ''))
+          PY
+          }
+          if curl --fail --location --silent --show-error \
+            --connect-timeout 10 --max-time 60 --retry 1 --retry-max-time 90 \
+            --proto '=https' --proto-redir '=https' \
+            -H 'Cache-Control: no-cache' \
+            "$PRIMARY_IPA_URL" -o "$RUNNER_TEMP/primary.ipa" \
+            && validate_ipa "$RUNNER_TEMP/primary.ipa"; then
+            cp "$RUNNER_TEMP/primary.ipa" "全能签.ipa"
+            echo "IPA source: primary sign.drnrt8.cn" >> "$GITHUB_STEP_SUMMARY"
+            echo "IPA source: primary sign.drnrt8.cn"
+          else
+            echo "::warning::Primary IPA unavailable or invalid; using main/全能签.ipa"
+            validate_ipa "全能签.ipa"
+            echo "IPA source: GitHub main/全能签.ipa (fallback)" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          sha256sum "全能签.ipa"
+
       - name: Restore zsign cache
         id: zsign-cache
         uses: actions/cache@v5
@@ -48,7 +87,7 @@ jobs:
           test -x .tools/zsign
           .tools/zsign --version
 
-      - name: Download certificate from R2 and sign main source
+      - name: Download certificate from R2 and sign selected source
         env:
           CERT_ZIP_URL: ${{ secrets.CERT_ZIP_URL }}
           CERT_PASSWORD: ${{ secrets.CERT_PASSWORD }}
