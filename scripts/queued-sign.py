@@ -94,7 +94,8 @@ finally:
             print('Warning: multipart cleanup failed')
 manifest = {'items': [{'assets': [{'kind': 'software-package', 'url': PUBLIC + bundle + '.ipa?job=' + JOB}], 'metadata': {'bundle-identifier': bundle, 'bundle-version': version, 'kind': 'software', 'title': signed.get('CFBundleDisplayName', signed.get('CFBundleName', bundle))}}]}
 request('/api/sky-upload/object?' + urllib.parse.urlencode({'name': bundle + '.plist', 'scope': ''}), plistlib.dumps(manifest), 'PUT')
-# Keep the signed release as an additional backup; R2 publication is required by this queue.
-subprocess.run(['gh', 'release', 'upload', 'signed-latest', str(out), '--clobber'], check=True)
+# The large Sky package goes only to R2. Keep a release backup for the small app.
+if job['target'] == 'app':
+    subprocess.run(['gh', 'release', 'upload', 'signed-latest', str(out), '--clobber'], check=True)
 api('/api/signing/internal/complete?id=' + JOB, {'success': True, 'bundle': bundle, 'version': version})
 print('Published:', bundle, version)
