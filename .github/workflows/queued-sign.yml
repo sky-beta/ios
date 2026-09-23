@@ -1,0 +1,53 @@
+name: Queued certificate signing
+run-name: Sign ${{ inputs.job_id }}
+on:
+  workflow_dispatch:
+    inputs:
+      job_id:
+        required: true
+        type: string
+permissions:
+  contents: write
+jobs:
+  sign:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: sky-beta-cache-request-headers
+          sparse-checkout: |
+            scripts/queued-sign.py
+          sparse-checkout-cone-mode: false
+      - uses: actions/cache@v5
+        id: zsign
+        with:
+          path: .tools/zsign
+          key: zsign-${{ runner.os }}-e803f870dc686e6161d00d9b22c425b8acdfacee
+      - if: steps.zsign.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y g++ make pkg-config libssl-dev
+          git clone --filter=blob:none https://github.com/zhlynn/zsign.git "$RUNNER_TEMP/zsign"
+          git -C "$RUNNER_TEMP/zsign" checkout --detach e803f870dc686e6161d00d9b22c425b8acdfacee
+          make -C "$RUNNER_TEMP/zsign/build/linux" -j"$(nproc)"
+          mkdir -p .tools
+          install -m 0755 "$RUNNER_TEMP/zsign/bin/zsign" .tools/zsign
+      - name: Sign and publish queued job
+        env:
+          JOB_ID: ${{ inputs.job_id }}
+          SKY_UPLOAD_TOKEN: ${{ secrets.SKY_UPLOAD_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          CERT_PASSWORD: ${{ secrets.CERT_PASSWORD }}
+        run: python3 scripts/queued-sign.py
+      - name: Report failure if job did not complete
+        if: failure() || cancelled()
+        env:
+          JOB_ID: ${{ inputs.job_id }}
+          SKY_UPLOAD_TOKEN: ${{ secrets.SKY_UPLOAD_TOKEN }}
+        run: |
+          curl --fail --silent --show-error --retry 3 \
+            -H "Authorization: Bearer $SKY_UPLOAD_TOKEN" -H 'Content-Type: application/json' \
+            --data '{"success":false}' \
+            "https://ios-cert-app.pages.dev/api/signing/internal/complete?id=$JOB_ID"
