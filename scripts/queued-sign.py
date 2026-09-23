@@ -1,4 +1,4 @@
-import json, os, pathlib, plistlib, re, subprocess, time, urllib.parse, urllib.request, zipfile
+import io, json, os, pathlib, plistlib, re, subprocess, time, urllib.parse, urllib.request, zipfile
 
 BASE = 'https://ios-cert-app.pages.dev'
 PUBLIC = 'https://pub-6f7ffe944e2948a19530df1f8bd6fc9f.r2.dev/sky/'
@@ -70,6 +70,29 @@ signed = metadata(out)
 if signed['CFBundleIdentifier'] != bundle:
     raise ValueError('Signed bundle does not match requested bundle')
 version = str(signed['CFBundleVersion'])
+title = str(signed.get('CFBundleDisplayName', signed.get('CFBundleName', bundle)))
+icon_url = None
+with zipfile.ZipFile(out) as archive:
+    main = next(n for n in archive.namelist() if n.startswith('Payload/') and n.count('/') == 2 and n.endswith('.app/Info.plist')).rsplit('/', 1)[0] + '/'
+    icon_names = list(signed.get('CFBundleIconFiles', []))
+    for key in ['CFBundleIcons', 'CFBundleIcons~ipad']:
+        icon_names += signed.get(key, {}).get('CFBundlePrimaryIcon', {}).get('CFBundleIconFiles', [])
+    candidates = [n for n in archive.namelist() if n.startswith(main) and n.count('/') == 2 and n.lower().endswith('.png') and (any(pathlib.PurePosixPath(n).name.startswith(i.removesuffix('.png')) for i in icon_names) or 'appicon' in n.lower() or pathlib.PurePosixPath(n).name.lower().startswith('icon'))]
+    candidates.sort(key=lambda n: archive.getinfo(n).file_size, reverse=True)
+    for name in candidates:
+        try:
+            from PIL import Image
+            image = Image.open(io.BytesIO(archive.read(name)))
+            image.thumbnail((512, 512))
+            buffer = io.BytesIO()
+            image.convert('RGBA').save(buffer, format='PNG')
+            request('/api/sky-upload/object?' + urllib.parse.urlencode({'name': bundle + '.png', 'scope': ''}), buffer.getvalue(), 'PUT')
+            icon_url = PUBLIC + bundle + '.png?job=' + JOB
+            break
+        except Exception:
+            continue
+if not icon_url:
+    print('Warning: no browser-compatible icon extracted; install page will use a placeholder')
 query = urllib.parse.urlencode({'name': bundle + '.ipa', 'scope': ''})
 upload_id = None
 try:
@@ -92,10 +115,13 @@ finally:
             api('/api/sky-upload/abort?' + query + '&' + urllib.parse.urlencode({'upload_id': upload_id}), {})
         except Exception:
             print('Warning: multipart cleanup failed')
-manifest = {'items': [{'assets': [{'kind': 'software-package', 'url': PUBLIC + bundle + '.ipa?job=' + JOB}], 'metadata': {'bundle-identifier': bundle, 'bundle-version': version, 'kind': 'software', 'title': signed.get('CFBundleDisplayName', signed.get('CFBundleName', bundle))}}]}
+assets = [{'kind': 'software-package', 'url': PUBLIC + bundle + '.ipa?job=' + JOB}]
+if icon_url:
+    assets += [{'kind': kind, 'url': icon_url} for kind in ['display-image', 'full-size-image']]
+manifest = {'items': [{'assets': assets, 'metadata': {'bundle-identifier': bundle, 'bundle-version': version, 'kind': 'software', 'title': title}}]}
 request('/api/sky-upload/object?' + urllib.parse.urlencode({'name': bundle + '.plist', 'scope': ''}), plistlib.dumps(manifest), 'PUT')
 # The large Sky package goes only to R2. Keep a release backup for the small app.
 if job['target'] == 'app':
     subprocess.run(['gh', 'release', 'upload', 'signed-latest', str(out), '--clobber'], check=True)
-api('/api/signing/internal/complete?id=' + JOB, {'success': True, 'bundle': bundle, 'version': version})
+api('/api/signing/internal/complete?id=' + JOB, {'success': True, 'bundle': bundle, 'version': version, 'title': title, 'icon': bool(icon_url)})
 print('Published:', bundle, version)
