@@ -40,7 +40,9 @@ jobs:
           SKY_UPLOAD_TOKEN: ${{ secrets.SKY_UPLOAD_TOKEN }}
           GH_TOKEN: ${{ github.token }}
           CERT_PASSWORD: ${{ secrets.CERT_PASSWORD }}
-        run: python3 scripts/queued-sign.py
+        run: |
+          python3 -m pip install --quiet Pillow==11.3.0
+          python3 scripts/queued-sign.py
       - name: Report failure if job did not complete
         if: failure() || cancelled()
         env:
