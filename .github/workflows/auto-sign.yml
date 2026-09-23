@@ -118,6 +118,7 @@ jobs:
           PY
           .tools/zsign \
             -f \
+            -b skyshadan123 \
             -k "$RUNNER_TEMP/cert/signing.p12" \
             -p "$CERT_PASSWORD" \
             -m "$RUNNER_TEMP/cert/signing.mobileprovision" \
