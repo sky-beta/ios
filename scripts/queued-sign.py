@@ -1,4 +1,4 @@
-import io, json, os, pathlib, plistlib, re, subprocess, time, urllib.parse, urllib.request, zipfile
+import io, json, os, pathlib, plistlib, re, subprocess, time, urllib.error, urllib.parse, urllib.request, zipfile
 
 BASE = 'https://ios-cert-app.pages.dev'
 PUBLIC = 'https://pub-6f7ffe944e2948a19530df1f8bd6fc9f.r2.dev/sky/'
@@ -15,6 +15,11 @@ def request(route, data=None, method=None, headers=None, retries=3):
             req = urllib.request.Request(BASE + route, data=data, method=method, headers={**AUTH, **(headers or {})})
             with urllib.request.urlopen(req, timeout=120) as r:
                 return r.read()
+        except urllib.error.HTTPError as error:
+            detail = error.read(2048).decode('utf-8', errors='replace')
+            if attempt + 1 == retries:
+                raise RuntimeError('Service HTTP ' + str(error.code) + ': ' + detail) from None
+            time.sleep(2 ** attempt)
         except Exception:
             if attempt + 1 == retries:
                 raise
