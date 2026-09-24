@@ -134,7 +134,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           SKY_UPLOAD_TOKEN: ${{ secrets.SKY_UPLOAD_TOKEN }}
-          UPLOAD_API: https://app.idkwhn.ccwu.cc/api/sky-upload
+          UPLOAD_API: https://ios-cert-app.pages.dev/api/sky-upload
         run: |
           set -euo pipefail
           publish_github() {

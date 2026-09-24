@@ -71,7 +71,7 @@ jobs:
       SOURCE_IPA_URL: ${{ inputs.plugin_source == 'none' && 'https://pub-6f7ffe944e2948a19530df1f8bd6fc9f.r2.dev/sky/ios.ipa' || 'https://pub-6f7ffe944e2948a19530df1f8bd6fc9f.r2.dev/sky/Sky.ipa' }}
       PLUGIN_DEB_URL: https://pub-6f7ffe944e2948a19530df1f8bd6fc9f.r2.dev/sky/Sky.deb
       PLUGIN_DYLIB_URL: https://pub-6f7ffe944e2948a19530df1f8bd6fc9f.r2.dev/sky/Sky.dylib
-      UPLOAD_API: https://app.idkwhn.ccwu.cc/api/sky-upload
+      UPLOAD_API: https://ios-cert-app.pages.dev/api/sky-upload
       R2_PUBLIC_BASE: https://pub-6f7ffe944e2948a19530df1f8bd6fc9f.r2.dev
       R2_SCOPE: ${{ inputs.plugin_source == 'none' && 'ios' || (inputs.plugin_source == 'dylib' && 'Xu' || 'Sky') }}
       GITHUB_ASSET_PREFIX: ${{ inputs.plugin_source == 'none' && 'ios-app' || (inputs.plugin_source == 'dylib' && 'xu' || 'sky') }}
@@ -619,7 +619,7 @@ jobs:
     timeout-minutes: 45
     env:
       SOURCE_URL: https://koyeb.idkwhn.ccwu.cc/yan/ios.ipa
-      UPLOAD_API: https://app.idkwhn.ccwu.cc/api/sky-upload
+      UPLOAD_API: https://ios-cert-app.pages.dev/api/sky-upload
       OBJECT_NAME: ${{ inputs.operation == 'restore-ios' && 'ios.ipa' || 'com.tgc.sky.test.gold.ipa' }}
       EXPECTED_BUNDLE_ID: com.tgc.sky.test.gold
     steps:
@@ -734,7 +734,7 @@ jobs:
           if [[ "$SCOPE" == "all" ]]; then
             RESPONSE="$(curl --fail-with-body --silent --show-error --request POST \
               -H "Authorization: Bearer $SKY_UPLOAD_TOKEN" \
-              "https://app.idkwhn.ccwu.cc/api/sky-upload/cleanup-all?minimum_age_seconds=900")"
+              "https://ios-cert-app.pages.dev/api/sky-upload/cleanup-all?minimum_age_seconds=900")"
             python3 -c 'import json,sys; data=json.load(sys.stdin); assert data.get("success"); print(json.dumps(data, ensure_ascii=False))' \
               <<<"$RESPONSE"
             exit 0
@@ -753,7 +753,7 @@ jobs:
           )"
           RESPONSE="$(curl --fail-with-body --silent --show-error --request POST \
             -H "Authorization: Bearer $SKY_UPLOAD_TOKEN" \
-            "https://app.idkwhn.ccwu.cc/api/sky-upload/abort?$QUERY")"
+            "https://ios-cert-app.pages.dev/api/sky-upload/abort?$QUERY")"
           python3 -c 'import json,sys; data=json.load(sys.stdin); assert data.get("success") and data.get("aborted")' \
             <<<"$RESPONSE"
           echo "Incomplete multipart upload aborted."

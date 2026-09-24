@@ -29,7 +29,7 @@ jobs:
 
     env:
       SOURCE_IPA_URL: https://pub-6f7ffe944e2948a19530df1f8bd6fc9f.r2.dev/sky/com.tgc.sky.test.gold.ipa
-      UPLOAD_API: https://app.idkwhn.ccwu.cc/api/sky-upload
+      UPLOAD_API: https://ios-cert-app.pages.dev/api/sky-upload
       R2_PUBLIC_BASE: https://pub-6f7ffe944e2948a19530df1f8bd6fc9f.r2.dev
       R2_SCOPE: Beta
       REQUESTED_BUNDLE_ID: ${{ inputs.bundle_id }}
