@@ -28,6 +28,7 @@ jobs:
           set -euo pipefail
           mkdir -p _site
           cp account-manager.html _site/index.html
+          cp -R base bese _site/
           touch _site/.nojekyll
 
       - name: Upload Pages artifact
