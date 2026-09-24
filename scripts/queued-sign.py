@@ -5,7 +5,7 @@ PUBLIC = 'https://pub-6f7ffe944e2948a19530df1f8bd6fc9f.r2.dev/sky/'
 JOB = os.environ['JOB_ID']
 if not re.fullmatch('[a-f0-9]{64}', JOB):
     raise SystemExit('Invalid job ID')
-AUTH = {'Authorization': 'Bearer ' + os.environ['SKY_UPLOAD_TOKEN']}
+AUTH = {'Authorization': 'Bearer ' + os.environ['SKY_UPLOAD_TOKEN'], 'User-Agent': 'ios-cert-actions/1.0', 'Accept': '*/*'}
 WORK = pathlib.Path(os.environ.get('RUNNER_TEMP', '/tmp')) / ('sign-' + JOB)
 WORK.mkdir(exist_ok=True)
 
