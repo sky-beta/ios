@@ -91,6 +91,7 @@ jobs:
         env:
           CERT_ZIP_URL: ${{ secrets.CERT_ZIP_URL }}
           CERT_PASSWORD: ${{ secrets.CERT_PASSWORD }}
+          SKY_UPLOAD_TOKEN: ${{ secrets.SKY_UPLOAD_TOKEN }}
         run: |
           set -euo pipefail
           test -s "全能签.ipa"
@@ -98,6 +99,7 @@ jobs:
           test -n "$CERT_PASSWORD"
           mkdir -p "$RUNNER_TEMP/cert" dist
           curl --fail --location --silent --show-error --retry 5 --retry-all-errors \
+            -H "Authorization: Bearer $SKY_UPLOAD_TOKEN" \
             "$CERT_ZIP_URL" -o "$RUNNER_TEMP/cert.zip"
           python3 - <<'PY'
           from pathlib import Path
