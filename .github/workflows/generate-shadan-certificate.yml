@@ -1,0 +1,42 @@
+name: Generate shadan certificate ZIP
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  generate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Generate certificate with Apple API and store in private R2
+        env:
+          SKY_UPLOAD_TOKEN: ${{ secrets.SKY_UPLOAD_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$SKY_UPLOAD_TOKEN"
+          archive="$RUNNER_TEMP/shadan.zip"
+          curl --fail --silent --show-error --retry 2 --retry-all-errors \
+            -H "Authorization: Bearer $SKY_UPLOAD_TOKEN" \
+            "https://ios-cert-app.pages.dev/api/signing/internal/fixed-certificate" \
+            -o "$archive"
+          python3 - "$archive" <<'PY'
+          import sys
+          from pathlib import Path
+          from zipfile import ZipFile
+
+          path = Path(sys.argv[1])
+          expected = {"signing.p12", "signing.mobileprovision"}
+          with ZipFile(path) as archive:
+              if archive.testzip() is not None:
+                  raise SystemExit("Generated ZIP failed its CRC check")
+              names = {Path(item.filename).name for item in archive.infolist()}
+              if not expected.issubset(names):
+                  raise SystemExit("Generated ZIP is missing required certificate files")
+              for name in expected:
+                  item = next(item for item in archive.infolist() if Path(item.filename).name == name)
+                  if item.file_size == 0:
+                      raise SystemExit("Generated ZIP contains an empty certificate file")
+          print(f"Certificate ZIP validated ({path.stat().st_size} bytes); saved to private R2 key shadan.zip.")
+          PY
