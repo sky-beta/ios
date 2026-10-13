@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>华为国际服与 HMS 下载</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, "Noto Sans SC", system-ui, sans-serif; color: #edf6ff; background: #0b1424; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; padding: 48px 22px; background: radial-gradient(ellipse at top, #24456f, #0b1424 65%); }
+    main { max-width: 880px; margin: auto; }
+    .back { color: #a8cbef; text-decoration: none; }
+    h1 { margin: 32px 0 12px; font-size: clamp(28px, 6vw, 42px); letter-spacing: -.03em; }
+    .intro, .meta { color: #9eb3ca; line-height: 1.8; }
+    .cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin: 28px 0; }
+    article { min-width: 0; display: flex; flex-direction: column; padding: 28px; border: 1px solid #ffffff20; border-radius: 22px; background: #101e34d9; }
+    .badge { align-self: start; padding: 5px 10px; border-radius: 8px; color: #ffc9d2; background: #cf0a2c30; font-size: 12px; }
+    article.hms .badge { color: #a6d9ff; background: #79c8ff20; }
+    h2 { margin: 20px 0 8px; font-size: 24px; }
+    .package { color: #91a8c0; font: 12px/1.6 ui-monospace, monospace; overflow-wrap: anywhere; }
+    .description { min-height: 52px; line-height: 1.7; color: #bed0e2; }
+    .button { display: block; margin-top: 12px; padding: 15px; text-align: center; border-radius: 12px; color: white; background: #cf0a2c; text-decoration: none; font-weight: 700; }
+    .hms .button { background: #79c8ff; color: #081728; }
+    .button[aria-disabled="true"] { opacity: .45; pointer-events: none; }
+    details { margin-top: 20px; font-size: 13px; color: #9eb3ca; }
+    summary { cursor: pointer; }
+    .url { display: block; margin-top: 10px; line-height: 1.7; word-break: break-all; }
+    .status { padding: 14px 18px; border: 1px solid #ffffff20; border-radius: 12px; color: #b4c8de; line-height: 1.7; }
+    .status[data-state="ready"] { color: #92eab8; }
+    .status[data-state="error"] { color: #ffbd93; }
+    .meta { font-size: 13px; }
+    @media (max-width: 600px) { body { padding: 28px 18px; } .cards { grid-template-columns: 1fr; } article { padding: 24px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <a class="back" href="./">← 返回版本与 BuildConfig 页面</a>
+    <h1>华为国际服与 HMS</h1>
+    <p class="intro">集中查看、下载华为渠道国际服与 HMS Core。</p>
+    <div class="cards">
+      <article>
+        <span class="badge">华为渠道</span>
+        <h2>光·遇国际服</h2>
+        <div class="package">com.tgc.sky.android.huawei</div>
+        <p class="description">华为 AppGallery 提供的国际服 APK。</p>
+        <a class="button" id="huawei-download" aria-disabled="true" tabindex="-1">下载华为国际服 APK</a>
+        <details><summary>查看下载地址</summary><span class="url" id="huawei-url">正在读取…</span></details>
+      </article>
+      <article class="hms">
+        <span class="badge">华为移动服务</span>
+        <h2>HMS Core</h2>
+        <div class="package">com.huawei.hwid</div>
+        <p class="description">华为移动服务 APK，可按设备和游戏提示安装。</p>
+        <a class="button" id="hms-download" aria-disabled="true" tabindex="-1">下载 HMS Core APK</a>
+        <details><summary>查看下载地址</summary><span class="url" id="hms-url">正在读取…</span></details>
+      </article>
+    </div>
+    <div class="status" id="status" role="status" aria-live="polite">正在读取最新下载地址…</div>
+    <p class="meta">地址最后更新：<time id="updated-at">—</time><br>地址更新次数：<span id="update-count">—</span><br>GitHub 工作流每半小时检查一次，地址变化时更新。</p>
+  </main>
+  <script>
+    const timeFormat = new Intl.DateTimeFormat("zh-CN", {
+      timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23"
+    });
+    let hasData = false;
+
+    function validateDownload(value, packageName) {
+      const url = new URL(value);
+      if (url.protocol !== "https:" || url.username || url.password ||
+          !url.hostname.endsWith(".dbankcloud.com") ||
+          !url.pathname.split("/").pop().startsWith(packageName + ".") ||
+          !url.pathname.endsWith(".apk")) {
+        throw new Error("下载地址格式无效");
+      }
+      return url.href;
+    }
+
+    async function updateDownloads() {
+      const status = document.querySelector("#status");
+      try {
+        const response = await fetch(`./huawei.json?t=${Date.now()}`, { cache: "no-store" });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        const urls = {
+          huawei: validateDownload(data.downloads?.huawei, "com.tgc.sky.android.huawei"),
+          hms: validateDownload(data.downloads?.hms, "com.huawei.hwid")
+        };
+        const updatedAt = new Date(data.last_updated);
+        if (!Number.isFinite(updatedAt.getTime()) || !Number.isInteger(data.update_count) || data.update_count < 1) {
+          throw new Error("更新时间或计数无效");
+        }
+        for (const [key, url] of Object.entries(urls)) {
+          const link = document.querySelector(`#${key}-download`);
+          link.href = url;
+          link.removeAttribute("aria-disabled");
+          link.removeAttribute("tabindex");
+          document.querySelector(`#${key}-url`).textContent = url;
+        }
+        document.querySelector("#updated-at").textContent = timeFormat.format(updatedAt) + " 北京时间";
+        document.querySelector("#updated-at").dateTime = data.last_updated;
+        document.querySelector("#update-count").textContent = data.update_count;
+        hasData = true;
+        status.dataset.state = "ready";
+        status.textContent = "已同步最新下载地址";
+      } catch (error) {
+        status.dataset.state = "error";
+        status.textContent = hasData ? "同步失败，当前显示上次成功读取的地址；稍后自动重试。" : "暂时无法读取下载地址，请稍后刷新页面。";
+        console.error(error);
+      }
+    }
+
+    updateDownloads();
+    setInterval(updateDownloads, 300000);
+  </script>
+</body>
+</html>
