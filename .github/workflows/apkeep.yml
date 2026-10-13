@@ -122,26 +122,25 @@ jobs:
             echo "Huawei did not return a valid international Sky APK download URL." >&2
             exit 1
           }
-          old_count=0
           if [[ -f "$data_file" ]]; then
             if jq -e --arg huawei "$HUAWEI_LOCATION" --arg hms "$HMS_LOCATION" \
-              '.downloads.huawei == $huawei and .downloads.hms == $hms' "$data_file" >/dev/null; then
+              '.downloads.huawei == $huawei and .downloads.hms == $hms and
+               (.apps.huawei.version | type == "string") and (.apps.hms.version | type == "string")' \
+              "$data_file" >/dev/null && \
+              [[ -s "bese/${PACKAGE_NAME}/huawei-icon.png" && -s "bese/${PACKAGE_NAME}/hms-icon.png" ]]; then
               echo "Huawei and HMS download addresses are unchanged."
               exit 0
             fi
-            old_count="$(jq -r '.update_count // 0' "$data_file")"
           fi
-          [[ "$old_count" =~ ^[0-9]+$ ]] || { echo "Invalid Huawei update_count." >&2; exit 1; }
-          mkdir -p "$(dirname "$data_file")"
-          updated_at="$(TZ=Asia/Shanghai date '+%Y-%m-%dT%H:%M:%S%:z')"
-          jq -n --argjson count "$((old_count + 1))" --arg updated_at "$updated_at" \
-            --arg huawei "$HUAWEI_LOCATION" --arg hms "$HMS_LOCATION" \
-            '{update_count:$count,last_updated:$updated_at,downloads:{huawei:$huawei,hms:$hms}}' \
-            > "$data_file"
+          python3 -m pip install --quiet 'Pillow==11.3.0'
+          aapt_bin="$(find "${ANDROID_HOME}/build-tools" -type f -name aapt -print | sort -V | tail -n 1)"
+          [[ -x "$aapt_bin" ]] || { echo "Android aapt is unavailable." >&2; exit 1; }
+          python3 scripts/update-huawei.py --data-file "$data_file" --aapt "$aapt_bin" \
+            --huawei-url "$HUAWEI_LOCATION" --hms-url "$HMS_LOCATION"
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add "$data_file"
-          git commit -m "Update Huawei and HMS download URLs ($((old_count + 1)))"
+          git add "$data_file" "bese/${PACKAGE_NAME}/huawei-icon.png" "bese/${PACKAGE_NAME}/hms-icon.png"
+          git commit -m "Update Huawei and HMS download metadata"
           git push
           echo "changed=true" >> "$GITHUB_OUTPUT"
 

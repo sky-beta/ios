@@ -18,6 +18,9 @@
     .badge { align-self: start; padding: 5px 10px; border-radius: 8px; color: #ffc9d2; background: #cf0a2c30; font-size: 12px; }
     article.hms .badge { color: #a6d9ff; background: #79c8ff20; }
     h2 { margin: 20px 0 8px; font-size: 24px; }
+    .app-icon { width: 76px; height: 76px; margin-top: 22px; border-radius: 18px; object-fit: contain; background: #ffffff0a; }
+    .app-info { margin: 0 0 16px; color: #9eb3ca; font-size: 13px; line-height: 1.9; }
+    .app-info span { color: #edf6ff; }
     .package { color: #91a8c0; font: 12px/1.6 ui-monospace, monospace; overflow-wrap: anywhere; }
     .description { min-height: 52px; line-height: 1.7; color: #bed0e2; }
     .button { display: block; margin-top: 12px; padding: 15px; text-align: center; border-radius: 12px; color: white; background: #cf0a2c; text-decoration: none; font-weight: 700; }
@@ -41,17 +44,21 @@
     <div class="cards">
       <article>
         <span class="badge">华为渠道</span>
+        <img class="app-icon" id="huawei-icon" alt="光遇应用图标" width="76" height="76" hidden>
         <h2>光·遇国际服</h2>
         <div class="package">com.tgc.sky.android.huawei</div>
         <p class="description">华为 AppGallery 提供的国际服 APK。</p>
+        <p class="app-info">版本：<span id="huawei-version">—</span><br>Version Code：<span id="huawei-version-code">—</span><br>更新时间：<span id="huawei-updated">—</span><br>时间来源：下载地址中的日期</p>
         <a class="button" id="huawei-download" aria-disabled="true" tabindex="-1">下载华为国际服 APK</a>
         <details><summary>查看下载地址</summary><span class="url" id="huawei-url">正在读取…</span></details>
       </article>
       <article class="hms">
         <span class="badge">华为移动服务</span>
+        <img class="app-icon" id="hms-icon" alt="HMS Core 应用图标" width="76" height="76" hidden>
         <h2>HMS Core</h2>
         <div class="package">com.huawei.hwid</div>
         <p class="description">华为移动服务 APK，可按设备和游戏提示安装。</p>
+        <p class="app-info">版本：<span id="hms-version">—</span><br>Version Code：<span id="hms-version-code">—</span><br>更新时间：<span id="hms-updated">—</span><br>时间来源：下载地址中的日期</p>
         <a class="button" id="hms-download" aria-disabled="true" tabindex="-1">下载 HMS Core APK</a>
         <details><summary>查看下载地址</summary><span class="url" id="hms-url">正在读取…</span></details>
       </article>
@@ -97,6 +104,18 @@
           link.removeAttribute("aria-disabled");
           link.removeAttribute("tabindex");
           document.querySelector(`#${key}-url`).textContent = url;
+          const app = data.apps?.[key];
+          if (app) {
+            document.querySelector(`#${key}-version`).textContent = app.version || "—";
+            document.querySelector(`#${key}-version-code`).textContent = app.version_code || "—";
+            const appTime = new Date(app.updated_at);
+            document.querySelector(`#${key}-updated`).textContent = Number.isFinite(appTime.getTime()) ? timeFormat.format(appTime) + "（地址时间）" : "—";
+            if (app.icon === `${key}-icon.png` && /^[a-f0-9]{64}$/.test(app.icon_sha256 || "")) {
+              const icon = document.querySelector(`#${key}-icon`);
+              icon.src = `./${app.icon}?v=${app.icon_sha256}`;
+              icon.hidden = false;
+            }
+          }
         }
         document.querySelector("#updated-at").textContent = timeFormat.format(updatedAt) + " 北京时间";
         document.querySelector("#updated-at").dateTime = data.last_updated;
