@@ -2,22 +2,23 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="color-scheme" content="dark">
   <title>Sky</title>
   <style>
-    :root { color-scheme: dark; font-family: Inter, "Noto Sans SC", system-ui, sans-serif; color: #edf6ff; background: #0b1424; }
+    :root { color-scheme: dark; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", system-ui, sans-serif; color: #edf6ff; background: #0b1424; -webkit-text-size-adjust: 100%; }
     * { box-sizing: border-box; }
-    body { margin: 0; min-height: 100vh; min-height: 100svh; display: grid; place-items: center; padding: 28px 20px; background: radial-gradient(ellipse at top, #24456f, #0b1424 70%); }
-    main { width: min(440px, 100%); padding: 38px 30px 30px; text-align: center; border: 1px solid #ffffff20; border-radius: 28px; background: #101e34d9; box-shadow: 0 24px 70px #00000030; }
-    .app-icon { display: block; width: 104px; height: 104px; margin: 0 auto; border-radius: 24px; object-fit: cover; background: #ffffff0a; box-shadow: 0 12px 32px #00000030; }
+    body { margin: 0; min-height: 100vh; min-height: 100svh; display: grid; place-items: center; padding: 28px 20px; padding: max(24px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); background: radial-gradient(ellipse at top, #24456f, #0b1424 70%); }
+    main { width: min(440px, 100%); min-width: 0; padding: clamp(24px, 6vw, 38px) clamp(20px, 5vw, 30px) 28px; text-align: center; border: 1px solid #ffffff20; border-radius: 28px; background: #101e34d9; box-shadow: 0 24px 70px #00000030; }
+    .app-icon { display: block; width: clamp(80px, 24vw, 104px); height: auto; aspect-ratio: 1; margin: 0 auto; border-radius: 24px; object-fit: cover; background: #ffffff0a; box-shadow: 0 12px 32px #00000030; }
     .app-icon[hidden] { display: none; }
-    h1 { margin: 22px 0 24px; font-size: 36px; font-weight: 700; letter-spacing: -.03em; }
+    h1 { margin: 22px 0 24px; font-size: clamp(30px, 6vw, 36px); font-weight: 700; letter-spacing: -.03em; }
     .app-info { margin: 0; font-size: 14px; line-height: 1.8; }
-    .app-info p { margin: 8px 0; }
+    .app-info p { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; margin: 8px 0; }
+    .app-info time { white-space: nowrap; }
     .version-code { margin-left: 10px; }
     .label { margin-right: 12px; color: #91a8c0; }
-    .note { margin: 20px 0 26px; color: #b8c9dc; font-size: 13px; line-height: 1.9; text-wrap: pretty; }
+    .note { margin: 20px 0 26px; color: #b8c9dc; font-size: 13px; line-height: 1.9; text-wrap: pretty; overflow-wrap: anywhere; }
     .actions { display: grid; gap: 12px; }
     .button { display: grid; place-items: center; min-height: 52px; padding: 14px 18px; border-radius: 14px; color: white; background: #cf0a2c; text-decoration: none; font-size: 15px; font-weight: 650; transition: background .15s, transform .15s; }
     .button:hover { background: #e0143a; transform: translateY(-1px); }
@@ -26,6 +27,9 @@
     .button:focus-visible { outline: 3px solid #fff; outline-offset: 4px; }
     .button[aria-disabled="true"] { opacity: .45; pointer-events: none; }
     @media (max-width: 380px) { main { padding: 30px 22px 24px; } .app-info { font-size: 13px; } .label { margin-right: 8px; } }
+    @media (min-width: 768px) { main { width: min(520px, 100%); padding: 40px 36px 36px; } .actions { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-height: 560px) and (orientation: landscape) { body { align-items: start; } main { padding-top: 24px; } .app-icon { width: 72px; } h1 { margin: 14px 0; } .note { margin: 14px 0 20px; } }
+    @media (prefers-reduced-motion: reduce) { .button { transition: none; } .button:hover { transform: none; } }
   </style>
 </head>
 <body>
