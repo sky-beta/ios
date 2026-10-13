@@ -54,7 +54,6 @@
       </article>
       <article class="hms">
         <span class="badge">华为移动服务</span>
-        <img class="app-icon" id="hms-icon" alt="HMS Core 应用图标" width="76" height="76" hidden>
         <h2>HMS Core</h2>
         <div class="package">com.huawei.hwid</div>
         <p class="description">华为移动服务 APK，可按设备和游戏提示安装。</p>
@@ -110,7 +109,7 @@
             document.querySelector(`#${key}-version-code`).textContent = app.version_code || "—";
             const appTime = new Date(app.updated_at);
             document.querySelector(`#${key}-updated`).textContent = Number.isFinite(appTime.getTime()) ? timeFormat.format(appTime) + "（地址时间）" : "—";
-            if (app.icon === `${key}-icon.png` && /^[a-f0-9]{64}$/.test(app.icon_sha256 || "")) {
+            if (key === "huawei" && app.icon === "huawei-icon.png" && /^[a-f0-9]{64}$/.test(app.icon_sha256 || "")) {
               const icon = document.querySelector(`#${key}-icon`);
               icon.src = `./${app.icon}?v=${app.icon_sha256}`;
               icon.hidden = false;
