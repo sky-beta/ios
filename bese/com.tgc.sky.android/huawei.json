@@ -4,5 +4,23 @@
   "downloads": {
     "huawei": "https://appdlc-dra.hispace.dbankcloud.com/dl/appdl/application/apk/f6/f63f8c87c1724512b9666d3c7724d4db/com.tgc.sky.android.huawei.2610080712.apk?maple=0&trackId=0&distOpEntity=HKS",
     "hms": "https://appdlc-dra.hispace.dbankcloud.com/dl/appdl/application/apk/a1/a1d95e953c074f5087698940ed1569ae/com.huawei.hwid.2610121804.apk?maple=0&trackId=0&distOpEntity=HWSW"
+  },
+  "apps": {
+    "huawei": {
+      "package": "com.tgc.sky.android.huawei",
+      "version": "0.35.0 (421155)",
+      "version_code": "421155",
+      "updated_at": "2026-10-08T07:12:00+08:00",
+      "icon": "huawei-icon.png",
+      "icon_sha256": "34f8b0d6fb53707e24a5fab086d9b7f9fbe38c0bf25390579d235fbf0bb8b6dd"
+    },
+    "hms": {
+      "package": "com.huawei.hwid",
+      "version": "6.16.2.300",
+      "version_code": "61602300",
+      "updated_at": "2026-10-12T18:04:00+08:00",
+      "icon": "hms-icon.png",
+      "icon_sha256": "81be10ce500beba0a4ba9af4c0767f336390377ddcab759ff56e46278f932c20"
+    }
   }
 }
