@@ -15,6 +15,7 @@
     h1 { margin: 22px 0 24px; font-size: 36px; font-weight: 700; letter-spacing: -.03em; }
     .app-info { margin: 0; font-size: 14px; line-height: 1.8; }
     .app-info p { margin: 8px 0; }
+    .version-code { margin-left: 10px; }
     .label { margin-right: 12px; color: #91a8c0; }
     .note { margin: 20px 0 26px; color: #b8c9dc; font-size: 13px; line-height: 1.9; text-wrap: pretty; }
     .actions { display: grid; gap: 12px; }
@@ -32,7 +33,7 @@
     <img class="app-icon" id="huawei-icon" alt="光遇应用图标" width="104" height="104" hidden>
     <h1>Sky</h1>
     <div class="app-info">
-      <p><span class="label">版本</span><span id="huawei-version">—</span></p>
+      <p><span class="label">版本</span><strong id="huawei-version">—</strong><strong class="version-code" id="huawei-version-code">—</strong></p>
       <p><span class="label">更新时间</span><time id="huawei-updated">—</time></p>
     </div>
     <p class="note">说明：非华为手机先安装HMS框架 否则黑屏闪退</p>
@@ -73,6 +74,7 @@
           throw new Error("Invalid Sky metadata");
         }
         document.querySelector("#huawei-version").textContent = app.version.replace(/\s*\(\d+\)\s*$/, "");
+        document.querySelector("#huawei-version-code").textContent = app.version_code || "—";
         const parts = Object.fromEntries(timeFormat.formatToParts(appTime).map(part => [part.type, part.value]));
         const updated = document.querySelector("#huawei-updated");
         updated.textContent = `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}`;
