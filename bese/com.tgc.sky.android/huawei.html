@@ -9,11 +9,11 @@
     :root { color-scheme: dark; font-family: Inter, "Noto Sans SC", system-ui, sans-serif; color: #edf6ff; background: #0b1424; }
     * { box-sizing: border-box; }
     body { margin: 0; min-height: 100vh; padding: 48px 22px; background: radial-gradient(ellipse at top, #24456f, #0b1424 65%); }
-    main { max-width: 880px; margin: auto; }
+    main { max-width: 680px; margin: auto; }
     .back { color: #a8cbef; text-decoration: none; }
     h1 { margin: 32px 0 12px; font-size: clamp(28px, 6vw, 42px); letter-spacing: -.03em; }
     .intro, .meta { color: #9eb3ca; line-height: 1.8; }
-    .cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin: 28px 0; }
+    .cards { display: grid; grid-template-columns: 1fr; gap: 20px; margin: 28px 0; }
     article { min-width: 0; display: flex; flex-direction: column; padding: 28px; border: 1px solid #ffffff20; border-radius: 22px; background: #101e34d9; }
     .badge { align-self: start; padding: 5px 10px; border-radius: 8px; color: #ffc9d2; background: #cf0a2c30; font-size: 12px; }
     article.hms .badge { color: #a6d9ff; background: #79c8ff20; }
@@ -51,15 +51,7 @@
         <p class="app-info">版本：<span id="huawei-version">—</span><br>Version Code：<span id="huawei-version-code">—</span><br>更新时间：<span id="huawei-updated">—</span><br>时间来源：下载地址中的日期</p>
         <a class="button" id="huawei-download" aria-disabled="true" tabindex="-1">下载华为国际服 APK</a>
         <details><summary>查看下载地址</summary><span class="url" id="huawei-url">正在读取…</span></details>
-      </article>
-      <article class="hms">
-        <span class="badge">华为移动服务</span>
-        <h2>HMS Core</h2>
-        <div class="package">com.huawei.hwid</div>
-        <p class="description">华为移动服务 APK，可按设备和游戏提示安装。</p>
-        <p class="app-info">版本：<span id="hms-version">—</span><br>Version Code：<span id="hms-version-code">—</span><br>更新时间：<span id="hms-updated">—</span><br>时间来源：下载地址中的日期</p>
-        <a class="button" id="hms-download" aria-disabled="true" tabindex="-1">下载 HMS Core APK</a>
-        <details><summary>查看下载地址</summary><span class="url" id="hms-url">正在读取…</span></details>
+        <div class="hms"><a class="button" id="hms-download" aria-disabled="true" tabindex="-1">下载 HMS Core APK</a></div>
       </article>
     </div>
     <div class="status" id="status" role="status" aria-live="polite">正在读取最新下载地址…</div>
@@ -102,8 +94,8 @@
           link.href = url;
           link.removeAttribute("aria-disabled");
           link.removeAttribute("tabindex");
-          document.querySelector(`#${key}-url`).textContent = url;
-          const app = data.apps?.[key];
+          if (key === "huawei") document.querySelector("#huawei-url").textContent = url;
+          const app = key === "huawei" ? data.apps?.huawei : null;
           if (app) {
             document.querySelector(`#${key}-version`).textContent = app.version || "—";
             document.querySelector(`#${key}-version-code`).textContent = app.version_code || "—";
