@@ -65,7 +65,7 @@
 
     async function updateDownloads() {
       try {
-        const response = await fetch(`./huawei.json?t=${Date.now()}`, { cache: "no-store" });
+        const response = await fetch(`../bese/com.tgc.sky.android/huawei.json?t=${Date.now()}`, { cache: "no-store" });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
         const urls = {
@@ -85,7 +85,7 @@
         updated.dateTime = app.updated_at;
         if (app.icon === "huawei-icon.png" && /^[a-f0-9]{64}$/.test(app.icon_sha256 || "")) {
           const icon = document.querySelector("#huawei-icon");
-          icon.src = `./${app.icon}?v=${app.icon_sha256}`;
+          icon.src = `../bese/com.tgc.sky.android/${app.icon}?v=${app.icon_sha256}`;
           icon.hidden = false;
         }
         for (const [key, url] of Object.entries(urls)) {
