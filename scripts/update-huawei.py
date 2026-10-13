@@ -103,7 +103,7 @@ def extract_app(url, package, key, aapt):
                     raise ValueError("APK manifest or resources are unexpectedly large")
                 sparse.writestr(name, archive.read(name))
         result = subprocess.run([aapt, "dump", "badging", str(sparse_apk)],
-                                check=True, capture_output=True, text=True)
+                                check=True, capture_output=True, text=True, encoding="utf-8", errors="replace")
         package_line = next(line for line in result.stdout.splitlines() if line.startswith("package:"))
         fields = dict(re.findall(r"(\w+)='([^']*)'", package_line))
         if fields.get("name") != package or not fields.get("versionName") or not fields.get("versionCode"):
@@ -111,14 +111,57 @@ def extract_app(url, package, key, aapt):
         icons = re.findall(r"^application-icon-(\d+):'([^']+)'", result.stdout, re.MULTILINE)
         raster_icons = [(int(density), name) for density, name in icons
                         if name.lower().endswith((".png", ".webp", ".jpg", ".jpeg"))]
-        if not raster_icons:
-            raise ValueError("APK has no raster application icon in aapt metadata")
-        icon_name = max(raster_icons)[1]
-        if archive.getinfo(icon_name).file_size > 8 * 1024 * 1024:
-            raise ValueError("Application icon exceeds 8 MiB")
-        with Image.open(io.BytesIO(archive.read(icon_name))) as image:
-            output = io.BytesIO()
-            image.convert("RGBA").save(output, format="PNG", optimize=True)
+        def read_image(name):
+            if archive.getinfo(name).file_size > 8 * 1024 * 1024:
+                raise ValueError("Application icon exceeds 8 MiB")
+            with Image.open(io.BytesIO(archive.read(name))) as image:
+                return image.convert("RGBA")
+
+        if raster_icons:
+            icon_name = max(raster_icons)[1]
+            image = read_image(icon_name)
+        else:
+            xml_icons = [name for _, name in icons if name.endswith(".xml")]
+            if not xml_icons:
+                raise ValueError("APK has no supported application icon")
+            icon_name = xml_icons[-1]
+            with zipfile.ZipFile(sparse_apk, "a") as sparse:
+                sparse.writestr(icon_name, archive.read(icon_name))
+            tree = subprocess.check_output([aapt, "dump", "xmltree", str(sparse_apk), icon_name],
+                                           text=True, encoding="utf-8", errors="replace")
+            layers = dict(re.findall(
+                r"E: (background|foreground)\b[\s\S]*?A: android:drawable\([^)]*\)\s*=\s*@?(0x[0-9a-fA-F]+)", tree))
+            if set(layers) != {"background", "foreground"}:
+                raise ValueError("Adaptive icon has unsupported layers")
+            resources = subprocess.check_output([aapt, "dump", "--values", "resources", str(sparse_apk)],
+                                                text=True, encoding="utf-8", errors="replace")
+            entries = list(re.finditer(r"(?m)^\s*(?:spec )?resource (0x[0-9a-fA-F]+)\b", resources))
+
+            def resource_image(resource_id):
+                paths = []
+                for i, entry in enumerate(entries):
+                    if entry[1].lower() == resource_id.lower():
+                        end = entries[i + 1].start() if i + 1 < len(entries) else len(resources)
+                        paths += re.findall(r'''(res/[^\s"']+\.(?:png|webp|jpg|jpeg))''', resources[entry.start():end])
+                density_order = {"ldpi": 120, "mdpi": 160, "hdpi": 240, "xhdpi": 320,
+                                 "xxhdpi": 480, "xxxhdpi": 640}
+
+                def density(path):
+                    match = re.search(r"-(ldpi|mdpi|hdpi|xhdpi|xxhdpi|xxxhdpi)(?:-|/)", path)
+                    return density_order[match[1]] if match else 0
+
+                if not paths:
+                    raise ValueError(f"Adaptive icon resource {resource_id} has no raster layer")
+                return read_image(max(paths, key=density))
+
+            background = resource_image(layers["background"])
+            foreground = resource_image(layers["foreground"])
+            image = Image.alpha_composite(background, foreground.resize(background.size, Image.Resampling.LANCZOS))
+            # Android adaptive icon layers use a 108dp canvas with a 72dp visible viewport.
+            margin_x, margin_y = image.width // 6, image.height // 6
+            image = image.crop((margin_x, margin_y, image.width - margin_x, image.height - margin_y))
+        output = io.BytesIO()
+        image.save(output, format="PNG", optimize=True)
         icon = output.getvalue()
     app = {"package": package, "version": fields["versionName"], "version_code": fields["versionCode"],
            "updated_at": address_time(url, package), "icon": f"{key}-icon.png",
