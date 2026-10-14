@@ -4,5 +4,8 @@
   "version_code": "421155",
   "sky_build_access_key": "1743442606-7c046ff9a692ff4a48ad68dcf54abfb01a261c7a81de63c02bcdf615f4502144",
   "last_checked": "2026-10-14T04:37:44+08:00",
-  "huawei_download_url": "https://appdlc-dra.hispace.dbankcloud.com/dl/appdl/application/apk/f6/f63f8c87c1724512b9666d3c7724d4db/com.tgc.sky.android.huawei.2610080712.apk?maple=0&trackId=0&distOpEntity=HKS"
+  "huawei_download_url": "https://appdlc-dra.hispace.dbankcloud.com/dl/appdl/application/apk/f6/f63f8c87c1724512b9666d3c7724d4db/com.tgc.sky.android.huawei.2610080712.apk?maple=0&trackId=0&distOpEntity=HKS",
+  "com.huawei.hwid_url": "https://store-drcn.hispace.dbankcloud.com/dl/appdl/application/apk/a1/a1d95e953c074f5087698940ed1569ae/com.huawei.hwid.2610121804.apk?maple=0&trackId=0&distOpEntity=HWSW",
+  "com.netease.sky.huawei_url": "https://appgallery.cloud.huawei.com"
 }
+

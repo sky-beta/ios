@@ -48,6 +48,8 @@ jobs:
       PACKAGE_NAME: com.tgc.sky.android
       HUAWEI_APP_URL: ${{ vars.HUAWEI_APP_URL }}
       HUAWEI_HMS_APP_URL: ${{ vars.HUAWEI_HMS_APP_URL }}
+      HUAWEI_HMS_FRAMEWORK_APP_URL: https://appgallery.cloud.huawei.com/appdl/C10132067
+      HUAWEI_NETEASE_APP_URL: https://appgallery.cloud.huawei.com/appdl/C100685413
       HUAWEI_DEV_APP_URL_1: ${{ vars.HUAWEI_DEV_APP_URL_1 }}
       HUAWEI_DEV_APP_URL_2: ${{ vars.HUAWEI_DEV_APP_URL_2 }}
       GOOGLE_PLAY_EMAIL: ${{ secrets.GOOGLE_PLAY_EMAIL }}
@@ -106,6 +108,42 @@ jobs:
             echo 'location<<HMS_LOCATION_EOF'
             echo "$location"
             echo 'HMS_LOCATION_EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Read Huawei HMS framework redirect fingerprint
+        id: hms_framework
+        shell: bash
+        run: |
+          set -euo pipefail
+          headers="$(curl --fail --silent --show-error --connect-timeout 15 --max-time 60 \
+            --retry 3 --retry-delay 2 --dump-header - --output /dev/null --max-redirs 0 "$HUAWEI_HMS_FRAMEWORK_APP_URL")"
+          location="$(sed -n 's/^[Ll]ocation:[[:space:]]*//p' <<<"$headers" | tr -d '\r' | tail -n 1)"
+          [[ "$location" =~ ^https://[^[:space:]]+/com\.huawei\.hwid\.[^/?[:space:]]+\.apk(\?.*)?$ ]] || {
+            echo "Huawei HMS framework page did not return a valid com.huawei.hwid APK download URL." >&2
+            exit 1
+          }
+          {
+            echo 'location<<HMS_FRAMEWORK_LOCATION_EOF'
+            echo "$location"
+            echo 'HMS_FRAMEWORK_LOCATION_EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Read Huawei NetEase Sky redirect fingerprint
+        id: huawei_netease
+        shell: bash
+        run: |
+          set -euo pipefail
+          headers="$(curl --fail --silent --show-error --connect-timeout 15 --max-time 60 \
+            --retry 3 --retry-delay 2 --dump-header - --output /dev/null --max-redirs 0 "$HUAWEI_NETEASE_APP_URL")"
+          location="$(sed -n 's/^[Ll]ocation:[[:space:]]*//p' <<<"$headers" | tr -d '\r' | tail -n 1)"
+          [[ "$location" =~ ^https://[^[:space:]]+$ ]] || {
+            echo "Huawei NetEase Sky page did not return a valid HTTPS Location." >&2
+            exit 1
+          }
+          {
+            echo 'location<<HUAWEI_NETEASE_LOCATION_EOF'
+            echo "$location"
+            echo 'HUAWEI_NETEASE_LOCATION_EOF'
           } >> "$GITHUB_OUTPUT"
 
       - name: Update Huawei and HMS download data
@@ -427,13 +465,14 @@ jobs:
           gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes "$updated_body"
 
       - name: Update Pages status data
-        if: steps.compare.outputs.changed == 'true'
         shell: bash
         env:
           TAG: ${{ steps.compare.outputs.tag }}
           DEX_ASSET: ${{ steps.compare.outputs.dex_asset }}
           BUILDCONFIG_ASSET: ${{ steps.compare.outputs.buildconfig_asset }}
           HUAWEI_LOCATION: ${{ steps.huawei.outputs.location }}
+          HUAWEI_HWID_LOCATION: ${{ steps.hms_framework.outputs.location }}
+          HUAWEI_NETEASE_LOCATION: ${{ steps.huawei_netease.outputs.location }}
         run: |
           set -euo pipefail
           package_dir="bese/${PACKAGE_NAME}"
@@ -471,7 +510,9 @@ jobs:
             --arg last_checked "$last_checked" \
             --arg sky_build_access_key "$sky_build_access_key" \
             --arg huawei_download_url "$HUAWEI_LOCATION" \
-            '{package:$package,version:$version,version_code:$version_code,sky_build_access_key:$sky_build_access_key,last_checked:$last_checked,huawei_download_url:$huawei_download_url}' \
+            --arg huawei_hwid_url "$HUAWEI_HWID_LOCATION" \
+            --arg huawei_netease_url "$HUAWEI_NETEASE_LOCATION" \
+            '{package:$package,version:$version,version_code:$version_code,sky_build_access_key:$sky_build_access_key,last_checked:$last_checked,huawei_download_url:$huawei_download_url,"com.huawei.hwid_url":$huawei_hwid_url,"com.netease.sky.huawei_url":$huawei_netease_url}' \
             > "bese/${PACKAGE_NAME}/status.json"
           jq -n \
             --arg sky_build_access_key "$sky_build_access_key" \
@@ -592,3 +633,4 @@ jobs:
         if: always() && steps.update_huawei.outputs.changed == 'true'
         shell: bash
         run: gh workflow run deploy-pages.yml --repo "$GITHUB_REPOSITORY" --ref main
+
