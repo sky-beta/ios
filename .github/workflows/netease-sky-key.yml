@@ -6,6 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  actions: write
   contents: write
 
 jobs:
@@ -24,15 +25,25 @@ jobs:
         run: python3 scripts/update-netease-sky-status.py --status-file bese/com.tgc.sky.android/status.json
 
       - name: Commit status changes
+        id: commit_status
         shell: bash
         run: |
           set -euo pipefail
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add bese/com.tgc.sky.android/status.json
+          echo "changed=false" >> "$GITHUB_OUTPUT"
           if ! git diff --cached --quiet; then
             git commit -m "Update NetEase Sky APK version and key"
             git push
+            echo "changed=true" >> "$GITHUB_OUTPUT"
           else
             echo "NetEase Sky status is unchanged."
           fi
+
+      - name: Deploy updated status page
+        if: steps.commit_status.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: gh workflow run deploy-pages.yml --repo "$GITHUB_REPOSITORY" --ref main
