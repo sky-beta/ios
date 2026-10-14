@@ -1,0 +1,38 @@
+name: Update NetEase Sky Android key status
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: apkeep-com.tgc.sky.android
+      cancel-in-progress: false
+    steps:
+      - name: Check out Pages source
+        uses: actions/checkout@v4
+
+      - name: Read NetEase APK and update status
+        shell: bash
+        run: python3 scripts/update-netease-sky-status.py --status-file bese/com.tgc.sky.android/status.json
+
+      - name: Commit status changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add bese/com.tgc.sky.android/status.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Update NetEase Sky APK version and key"
+            git push
+          else
+            echo "NetEase Sky status is unchanged."
+          fi
