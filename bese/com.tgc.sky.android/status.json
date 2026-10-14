@@ -9,9 +9,9 @@
   "com.netease.sky.huawei_url": "https://appdlc-dra.hispace.dbankcloud.com/dl/appdl/application/apk/e5/e5968c2e6ace48dd8a6b1a1314d65bfd/com.netease.sky.huawei.2609171814.apk?maple=0&trackId=0&distOpEntity=HWSW",
   "com.netease.sky": {
     "source_url": "https://adl.netease.com/d/g/sky/c/gw?type=android",
-    "apk_url": null,
-    "version": null,
-    "version_code": null,
-    "key": null
+    "apk_url": "https://ma75.gdl.netease.com/Sky-Gold-0.16.5-412659-obt_74557_netease_unisec_minify_8b27a2f618b5ea53b13cccd989aed742.apk?key1=62a608607e9b224dcc9d411822d115a9&key2=6acfef09",
+    "version": "0.16.5",
+    "version_code": "412659",
+    "key": "1743442606-83b7ab2d506b953536f9d0165960d9891a22df536fb125e30c3b47a93eda160f"
   }
 }
