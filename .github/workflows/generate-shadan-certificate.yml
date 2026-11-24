@@ -18,6 +18,7 @@ jobs:
           test -n "$SKY_UPLOAD_TOKEN"
           archive="$RUNNER_TEMP/shadan.zip"
           curl --fail --silent --show-error --retry 2 --retry-all-errors \
+            -X POST \
             -H "Authorization: Bearer $SKY_UPLOAD_TOKEN" \
             "https://ios-cert-app.pages.dev/api/signing/internal/fixed-certificate" \
             -o "$archive"
