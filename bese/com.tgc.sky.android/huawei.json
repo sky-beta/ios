@@ -1,16 +1,16 @@
 {
-  "update_count": 6,
-  "last_updated": "2026-11-25T10:55:16+08:00",
+  "update_count": 7,
+  "last_updated": "2026-11-27T06:48:03+08:00",
   "downloads": {
-    "huawei": "https://appdlc-dra.hispace.dbankcloud.com/dl/appdl/application/apk/ea/ea25dc7f55de497bbd88f9df2845ebf7/com.tgc.sky.android.huawei.2611182307.apk?maple=0&trackId=0&distOpEntity=HKS",
+    "huawei": "https://appdlc-dra.hispace.dbankcloud.com/dl/appdl/application/apk/21/216bdc56b259421294017d4f5fcd2b41/com.tgc.sky.android.huawei.2611260218.apk?maple=0&trackId=0&distOpEntity=HKS",
     "hms": "https://appdlc-dra.hispace.dbankcloud.com/dl/appdl/application/apk/cd/cd10e97c93574fa8b37fbbc9516bfa96/com.huawei.hwid.2611190942.apk?maple=0&trackId=0&distOpEntity=HWSW"
   },
   "apps": {
     "huawei": {
       "package": "com.tgc.sky.android.huawei",
-      "version": "0.35.5 (431758)",
-      "version_code": "431758",
-      "updated_at": "2026-11-18T23:07:00+08:00",
+      "version": "0.35.6 (433304)",
+      "version_code": "433304",
+      "updated_at": "2026-11-26T02:18:00+08:00",
       "icon": "huawei-icon.png",
       "icon_sha256": "34f8b0d6fb53707e24a5fab086d9b7f9fbe38c0bf25390579d235fbf0bb8b6dd"
     },
