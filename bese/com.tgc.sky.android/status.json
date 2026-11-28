@@ -6,5 +6,12 @@
   "last_checked": "2026-11-27T06:48:55+08:00",
   "huawei_download_url": "https://appdlc-dra.hispace.dbankcloud.com/dl/appdl/application/apk/21/216bdc56b259421294017d4f5fcd2b41/com.tgc.sky.android.huawei.2611260218.apk?maple=0&trackId=0&distOpEntity=HKS",
   "com.huawei.hwid_url": "https://appdlc-dra.hispace.dbankcloud.com/dl/appdl/application/apk/cd/cd10e97c93574fa8b37fbbc9516bfa96/com.huawei.hwid.2611190942.apk?maple=0&trackId=0&distOpEntity=HWSW",
-  "com.netease.sky.huawei_url": "https://appdlc-dra.hispace.dbankcloud.com/dl/appdl/application/apk/bf/bf1d0c87726544c0a8943a2a9f471195/com.netease.sky.huawei.2611102100.apk?maple=0&trackId=0&distOpEntity=HWSW"
+  "com.netease.sky.huawei_url": "https://appdlc-dra.hispace.dbankcloud.com/dl/appdl/application/apk/bf/bf1d0c87726544c0a8943a2a9f471195/com.netease.sky.huawei.2611102100.apk?maple=0&trackId=0&distOpEntity=HWSW",
+  "com.netease.sky": {
+    "source_url": "https://adl.netease.com/d/g/sky/c/gw?type=android",
+    "apk_url": "https://ma75.gdl.netease.com/Sky-Gold-0.16.8-421629-obt_76325_netease_unisec_minify_214bcbdc43fa364bb389cf82092cb308.apk?key1=f29ff7aa8bea5e74b16352059275b22d&key2=6b0b224b",
+    "version": "0.16.8",
+    "version_code": "421629",
+    "key": "1743442606-2ea0278e2fea41d4a7392f1e17333695043e7048b75720f57eb92d26f71bf244"
+  }
 }
